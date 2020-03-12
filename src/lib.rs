@@ -4,7 +4,7 @@ use std::path::Path;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use std::convert::From;
+use op::Op;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -114,9 +114,39 @@ impl Interpreter {
         }
     }
 
+    /// Update the state of the interpreter by running the operation
+    fn execute(&mut self, op: Op) {
+
+    }
+
+    /// Draw the 64x32 pixel map
+    fn draw(&mut self) {
+
+    }
+
+    /// Check for any changes to keyboard input (keys pressed or unpressed)
+    fn updateKeyInputs(&mut self) {
+
+    }
+
     /// step forward one tick in the interpreter. Read the instruction
     /// at the program counter, decode it, execute it, and update any internal state
     pub fn tick(&mut self) {
+        let msb = self.memory[self.pc as usize];
+        self.pc = self.pc + 1;
+        let lsb = self.memory[self.pc as usize];
+        self.pc = self.pc + 1;
+
+        let instr = two_u8s_to_16(msb, lsb);
+        let op = Op::from(instr);
+
+        self.execute(op);
+
+        if self.vf == 1 { // a display bit changed by the previous Op?
+            self.draw();
+        }
+
+        self.updateKeyInputs();
     }
 
     /// Read in a game file and initialize the necessary registers.
@@ -133,7 +163,7 @@ impl Interpreter {
 
     /// Read in a CHIP 8 game file and load it into memory starting at byte index 512
     fn read_game_file(&mut self, path: &Path) -> Result<(), Error> {
-        let buf = read_to_vec(path)?;
+        let buf = read_file_to_vec(path)?;
 
         let err_msg = format!("file {} is too large", path.to_str().unwrap());
         assert!(buf.len() < GAME_FILE_MEMORY_SIZE, err_msg);
@@ -146,12 +176,19 @@ impl Interpreter {
 }
 
 /// Read in a file located at path as a Vec<u8>
-fn read_to_vec(path: &Path) -> Result<Vec<u8>, Error> {
+fn read_file_to_vec(path: &Path) -> Result<Vec<u8>, Error> {
     let mut f = File::open(path)?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf);
 
     Ok(buf)
+}
+
+/// Take the msb and lsb u8s and merge them into a single 16. Used
+/// to convert two 8-bit pieces of data in memory into a single 16-bit
+/// instruction.
+fn two_u8s_to_16(msb: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 8) | (lsb as u16)
 }
 
 
