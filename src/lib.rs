@@ -1,7 +1,17 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
-use fixedbitset::FixedBitSet;
+use std::path::Path;
+use std::fs::File;
+use std::io::Error;
+use std::io::Read;
+use std::convert::From;
 
+const MEMORY_SIZE: usize = 4096;
+const DISPLAY_REFRESH_SIZE: usize = 256;
+const CALL_STACK_SIZE: usize = 96;
+const STARTING_MEMORY_BYTE: usize = 512;
+const GAME_FILE_MEMORY_SIZE: usize = MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE + STARTING_MEMORY_BYTE);
+const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
 // # Interpreter
 // * 4096 (0x1000) bytes of memory
 // * interpretor exists in the first 512 (0x200) bytes
@@ -26,24 +36,6 @@ use fixedbitset::FixedBitSet;
 
 // # Graphics
 // 64x32 pixels
-
-struct Nibble {
-    nib: FixedBitSet, // 4-bit nibble
-}
-
-impl Nibble {
-    fn new(one: u8, two: u8, three: u8, four: u8) -> Self {
-        let mut nib = FixedBitSet::with_capacity(4);
-        nib.set(0, one as boolean);
-        nib.set(1, two as boolean);
-        nib.set(2, three as boolean);
-        nib.set(3, four as boolean);
-
-        Nibble {
-            nib
-        }
-    }
-}
 
 pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
@@ -80,16 +72,156 @@ pub struct Interpreter {
 
     key_input: [u8; 16],     // 16 byte hex keyboard input (0-F).
                              // Each byte stores the 1 (on) or 0 (off) keypress state
-    font_set: [[u8; 5]; 2],    // stores the 16 5-byte hex font set
+    font_set: [[u8; 5]; 2],  // stores the 16 5-byte hex font set
 }
 
-/// 35 CHIP 8 op codes
-pub enum Op {
-    CALL_RCA(Nibble, Nibble, Nibble),
+/// 35 CHIP 8 op codes. The u8's are guaranteed to be between 0x0 and 0xF
+#[derive(Debug, PartialOrd, PartialEq)]
+enum Op {
+    // 0XXX
+    CallRca(u8, u8, u8),
+    DispClear,
+    Return,
+
+    // 1XXX
+    Goto(u8, u8, u8),
+
+    // 2XXX
+    GotoSubRtn(u8, u8, u8),
+
+    // 3XXX
+    CondVxEq(u8, u8, u8),
+
+    // 4XXX
+    CondVxNe(u8, u8, u8),
+
+    // 5XXX
+    CondVxVyEq(u8, u8),
+
+    // 6XXX
+    ConstSetVx(u8, u8, u8),
+
+    // 7XXX
+    ConstAddVx(u8, u8, u8),
+
+    // 8XXX
+    AssignVyToVx(u8, u8),
+    BitOpOr(u8, u8),
+    BitOpAnd(u8, u8),
+    BitOpXor(u8, u8),
+    MathVxAddVy(u8, u8),
+    MathVxMinusVy(u8, u8),
+    BitOpRtShift(u8, u8),
+    MathVyMinusVx(u8, u8),
+    BitOpLftShift(u8, u8),
+
+    // 9XXX
+    CondVxNeVy(u8, u8),
+
+    // AXXX
+    MemSetI(u8, u8, u8),
+
+    // BXXX
+    GotoPlusV0(u8, u8, u8),
+
+    // CXXX
+    Rand(u8, u8, u8),
+
+    // DXXX
+    DispDraw(u8, u8, u8),
+
+    // EXXX
+    KeyOpEqVx(u8),
+    KeyOpNeVx(u8),
+
+    // FXXX
+    DelayGet(u8),
+    KeyOpGet(u8),
+    DelaySet(u8),
+    SoundSet(u8),
+    MemIPlusEqVx(u8),
+    MemISetSprite(u8),
+    Bcd(u8),
+    RegDump(u8),
+    RegLoad(u8),
+}
+
+impl From<u16> for Op {
+    fn from(item: u16) -> Self {
+        let mask = 0xF;
+
+        // these are the 4 nibbles of item, where nibb_1 is the MSB and nibb_4 is the LSB
+        let nibb_1 = ((item >> 12) & mask) as u8 ;
+        let nibb_2 = ((item >> 8) & mask) as u8;
+        let nibb_3 = ((item >> 4) & mask) as u8;
+        let nibb_4 = (item & mask) as u8;
+        let nibbles = [nibb_1, nibb_2, nibb_3, nibb_4];
+
+        let panic_msg = format!("unknown u16 {}", item);
+
+        match nibbles {
+            [0x0, n2, n3, n4] => {
+                match n4 {
+                    0x0       => Op::DispClear,
+                    0xE       => Op::Return,
+                    _ => Op::CallRca(n2, n3, n4),
+                }
+            },
+            [0x1, n2, n3, n4] => Op::Goto(n2, n3, n4),
+            [0x2, n2, n3, n4] => Op::GotoSubRtn(n2, n3, n4),
+            [0x3, n2, n3, n4] => Op::CondVxEq(n2, n3, n4),
+            [0x4, n2, n3, n4] => Op::CondVxNe(n2, n3, n4),
+            [0x5, n2, n3, _]  => Op::CondVxVyEq(n2, n3),
+            [0x6, n2, n3, n4] => Op::ConstSetVx(n2, n3, n4),
+            [0x7, n2, n3, n4] => Op::ConstAddVx(n2, n3, n4),
+            [0x8, n2, n3, n4] => {
+                match n4 {
+                    0x0       => Op::AssignVyToVx(n2, n3),
+                    0x1       => Op::BitOpOr(n2, n3),
+                    0x2       => Op::BitOpAnd(n2, n3),
+                    0x3       => Op::BitOpXor(n2, n3),
+                    0x4       => Op::MathVxAddVy(n2, n3),
+                    0x5       => Op::MathVxMinusVy(n2, n3),
+                    0x6       => Op::BitOpRtShift(n2, n3),
+                    0x7       => Op::MathVyMinusVx(n2, n3),
+                    0xE       => Op::BitOpLftShift(n2, n3),
+                    _ => panic!(panic_msg),
+                }
+            },
+            [0x9, n2, n3, 0]  => Op::CondVxNeVy(n2, n3),
+            [0xA, n2, n3, n4] => Op::MemSetI(n2, n3, n4),
+            [0xB, n2, n3, n4] => Op::GotoPlusV0(n2, n3, n4),
+            [0xC, n2, n3, n4] => Op::Rand(n2, n3, n4),
+            [0xD, n2, n3, n4] => Op::DispDraw(n2, n3, n4),
+            [0xE, n2, n3, n4] => {
+                match [n3, n4] {
+                    [0x9, 0xE] => Op::KeyOpEqVx(n2),
+                    [0xA, 0x1] => Op::KeyOpNeVx(n2),
+                    _ => panic!(panic_msg),
+                }
+            },
+            [0xF, n2, n3, n4] => {
+                match [n3, n4] {
+                    [0x0, 0x7] => Op::DelayGet(n2),
+                    [0x0, 0xA] => Op::KeyOpGet(n2),
+                    [0x1, 0x5] => Op::DelaySet(n2),
+                    [0x1, 0x8] => Op::SoundSet(n2),
+                    [0x1, 0xE] => Op::MemIPlusEqVx(n2),
+                    [0x2, 0x9] => Op::MemISetSprite(n2),
+                    [0x3, 0x3] => Op::Bcd(n2),
+                    [0x5, 0x5] => Op::RegDump(n2),
+                    [0x6, 0x5] => Op::RegLoad(n2),
+                    _ => panic!(panic_msg),
+
+                }
+            }
+            _ => panic!(panic_msg),
+        }
+    }
 }
 
 impl Interpreter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Interpreter {
             memory: [0; 4096],
             stack: [0; 16],
@@ -125,11 +257,43 @@ impl Interpreter {
     }
 
     /// step forward one tick in the interpreter. Read the instruction
-    /// at the current address instruction register, decode it, execute it,
-    /// and update any internal state
-    fn tick(&mut self) -> Self {
-
+    /// at the program counter, decode it, execute it, and update any internal state
+    pub fn tick(&mut self) {
     }
+
+    /// Read in a game file and initialize the necessary registers.
+    ///
+    /// Returns an error if we fail to open the game file
+    pub fn initialize(&mut self, path: &Path) -> Result<(), Error> {
+        self.read_game_file(path)?;
+        self.sp = STACK_START as u16;
+        self.pc = STARTING_MEMORY_BYTE as u16;
+
+        Ok(())
+    }
+
+
+    /// Read in a CHIP 8 game file and load it into memory starting at byte index 512
+    fn read_game_file(&mut self, path: &Path) -> Result<(), Error> {
+        let buf = read_to_vec(path)?;
+
+        let err_msg = format!("file {} is too large", path.to_str().unwrap());
+        assert!(buf.len() < GAME_FILE_MEMORY_SIZE, err_msg);
+
+        let game_file_range = STARTING_MEMORY_BYTE..(STARTING_MEMORY_BYTE + buf.len());
+        self.memory[game_file_range].copy_from_slice(&buf);
+
+        Ok(())
+    }
+}
+
+/// Read in a file located at path as a Vec<u8>
+fn read_to_vec(path: &Path) -> Result<Vec<u8>, Error> {
+    let mut f = File::open(path)?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf);
+
+    Ok(buf)
 }
 
 
@@ -146,8 +310,9 @@ impl Interpreter {
 mod tests {
     use super::*;
     #[test]
-    fn it_works() {
-        let mut i = Interpreter::new();
-        i.memory[0] = 1;
+    fn convert_opcodes() {
+        let mut i: u16 = 1;
+        let op_num = (i << 8) | (i << 4) | i;
+        assert_eq!(Op::from(op_num), Op::CallRca(1, 1, 1));
     }
 }
