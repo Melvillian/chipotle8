@@ -271,14 +271,14 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn panic_convert_opcodes_E() {
+    fn panic_convert_opcodes_e() {
         let mut op_num = 0xED9F;
         Op::from(op_num);
     }
 
     #[test]
     #[should_panic]
-    fn panic_convert_opcodes_F() {
+    fn panic_convert_opcodes_f() {
         let mut op_num = 0xFDEF;
         Op::from(op_num);
     }
