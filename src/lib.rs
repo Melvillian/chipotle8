@@ -116,7 +116,7 @@ enum Op {
     BitOpLftShift(u8, u8),
 
     // 9XXX
-    CondVxNeVy(u8, u8),
+    CondVxVyNe(u8, u8),
 
     // AXXX
     MemSetI(u8, u8, u8),
@@ -188,7 +188,7 @@ impl From<u16> for Op {
                     _ => panic!(panic_msg),
                 }
             },
-            [0x9, n2, n3, 0]  => Op::CondVxNeVy(n2, n3),
+            [0x9, n2, n3, 0]  => Op::CondVxVyNe(n2, n3),
             [0xA, n2, n3, n4] => Op::MemSetI(n2, n3, n4),
             [0xB, n2, n3, n4] => Op::GotoPlusV0(n2, n3, n4),
             [0xC, n2, n3, n4] => Op::Rand(n2, n3, n4),
@@ -311,8 +311,109 @@ mod tests {
     use super::*;
     #[test]
     fn convert_opcodes() {
-        let mut i: u16 = 1;
-        let op_num = (i << 8) | (i << 4) | i;
-        assert_eq!(Op::from(op_num), Op::CallRca(1, 1, 1));
+        let mut op_num = 0x0FFF;
+        assert_eq!(Op::from(op_num), Op::CallRca(0xF, 0xF, 0xF));
+
+        op_num = 0x00E0;
+        assert_eq!(Op::from(op_num), Op::DispClear);
+
+        op_num = 0x00EE;
+        assert_eq!(Op::from(op_num), Op::Return);
+
+        op_num = 0x1000;
+        assert_eq!(Op::from(op_num), Op::Goto(0x0, 0x0, 0x0));
+
+        op_num = 0x2AAA;
+        assert_eq!(Op::from(op_num), Op::GotoSubRtn(0xA, 0xA, 0xA));
+
+        op_num = 0x3FAA;
+        assert_eq!(Op::from(op_num), Op::CondVxEq(0xF, 0xA, 0xA));
+
+        op_num = 0x4FAA;
+        assert_eq!(Op::from(op_num), Op::CondVxNe(0xF, 0xA, 0xA));
+
+        op_num = 0x5FAB;
+        assert_eq!(Op::from(op_num), Op::CondVxVyEq(0xF, 0xA));
+
+        op_num = 0x6FAB;
+        assert_eq!(Op::from(op_num), Op::ConstSetVx(0xF, 0xA, 0xB));
+
+        op_num = 0x7FAB;
+        assert_eq!(Op::from(op_num), Op::ConstAddVx(0xF, 0xA, 0xB));
+
+        op_num = 0x8FA0;
+        assert_eq!(Op::from(op_num), Op::AssignVyToVx(0xF, 0xA));
+
+        op_num = 0x8FA1;
+        assert_eq!(Op::from(op_num), Op::BitOpOr(0xF, 0xA));
+
+        op_num = 0x8FA2;
+        assert_eq!(Op::from(op_num), Op::BitOpAnd(0xF, 0xA));
+
+        op_num = 0x8FA3;
+        assert_eq!(Op::from(op_num), Op::BitOpXor(0xF, 0xA));
+
+        op_num = 0x8FA4;
+        assert_eq!(Op::from(op_num), Op::MathVxAddVy(0xF, 0xA));
+
+        op_num = 0x8FA5;
+        assert_eq!(Op::from(op_num), Op::MathVxMinusVy(0xF, 0xA));
+
+        op_num = 0x8FA6;
+        assert_eq!(Op::from(op_num), Op::BitOpRtShift(0xF, 0xA));
+
+        op_num = 0x8FA7;
+        assert_eq!(Op::from(op_num), Op::MathVyMinusVx(0xF, 0xA));
+
+        op_num = 0x8FAE;
+        assert_eq!(Op::from(op_num), Op::BitOpLftShift(0xF, 0xA));
+
+        op_num = 0x9FA0;
+        assert_eq!(Op::from(op_num), Op::CondVxVyNe(0xF, 0xA));
+
+        op_num = 0xAFAB;
+        assert_eq!(Op::from(op_num), Op::MemSetI(0xF, 0xA, 0xB));
+
+        op_num = 0xBFAB;
+        assert_eq!(Op::from(op_num), Op::GotoPlusV0(0xF, 0xA, 0xB));
+
+        op_num = 0xCFAB;
+        assert_eq!(Op::from(op_num), Op::Rand(0xF, 0xA, 0xB));
+
+        op_num = 0xDFAB;
+        assert_eq!(Op::from(op_num), Op::DispDraw(0xF, 0xA, 0xB));
+
+        op_num = 0xEF9E;
+        assert_eq!(Op::from(op_num), Op::KeyOpEqVx(0xF));
+
+        op_num = 0xEFA1;
+        assert_eq!(Op::from(op_num), Op::KeyOpNeVx(0xF));
+
+        op_num = 0xF907;
+        assert_eq!(Op::from(op_num), Op::DelayGet(0x9));
+
+        op_num = 0xF90A;
+        assert_eq!(Op::from(op_num), Op::KeyOpGet(0x9));
+
+        op_num = 0xF915;
+        assert_eq!(Op::from(op_num), Op::DelaySet(0x9));
+
+        op_num = 0xF918;
+        assert_eq!(Op::from(op_num), Op::SoundSet(0x9));
+
+        op_num = 0xF91E;
+        assert_eq!(Op::from(op_num), Op::MemIPlusEqVx(0x9));
+
+        op_num = 0xF929;
+        assert_eq!(Op::from(op_num), Op::MemISetSprite(0x9));
+
+        op_num = 0xF933;
+        assert_eq!(Op::from(op_num), Op::Bcd(0x9));
+
+        op_num = 0xF955;
+        assert_eq!(Op::from(op_num), Op::RegDump(0x9));
+
+        op_num = 0xF965;
+        assert_eq!(Op::from(op_num), Op::RegLoad(0x9));
     }
 }
