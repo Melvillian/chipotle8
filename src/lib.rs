@@ -179,6 +179,20 @@ impl Interpreter {
                 let reg_lsb = self.v[lsb as usize];
                 self.v[msb as usize] = reg_msb ^ reg_lsb;
             },
+            Op::MathVxAddVy(msb, lsb) => {
+                let msb_reg = self.v[msb as usize];
+                let lsb_reg = self.v[lsb as usize];
+
+                // check for carry
+                let (sum, did_overflow) = msb_reg.overflowing_add(lsb_reg);
+                self.v[msb as usize] = sum;
+
+                if did_overflow  {
+                    self.v[0xf] = 1
+                } else {
+                    self.v[0xf] = 0;
+                }
+            }
             _ => unimplemented!()
         }
 
@@ -543,7 +557,7 @@ mod interpreter_tests {
         fn assign_vx_vy_op() {
             let mut interpreter = Interpreter::new();
 
-            let instr: usize = 0x8AF0;
+            let instr: usize = 0x8AB0;
             let op = Op::from(instr as u16);
             let (msb, b, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
@@ -562,7 +576,7 @@ mod interpreter_tests {
         fn bit_or_op() {
             let mut interpreter = Interpreter::new();
 
-            let instr: usize = 0x8AF1;
+            let instr: usize = 0x8AB1;
             let op = Op::from(instr as u16);
             let (msb, b, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
@@ -581,7 +595,7 @@ mod interpreter_tests {
         fn bit_and_op() {
             let mut interpreter = Interpreter::new();
 
-            let instr: usize = 0x8AF2;
+            let instr: usize = 0x8AB2;
             let op = Op::from(instr as u16);
             let (msb, b, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
@@ -600,7 +614,7 @@ mod interpreter_tests {
         fn bit_xor_op() {
             let mut interpreter = Interpreter::new();
 
-            let instr: usize = 0x8AF3;
+            let instr: usize = 0x8AB3;
             let op = Op::from(instr as u16);
             let (msb, b, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
@@ -613,6 +627,46 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.v[msb_usize], 0b11111110);
             assert_eq!(interpreter.v[b_usize], 0b00110011)
+        }
+
+        #[test]
+        fn math_vx_add_vy_no_carry() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AB4;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 3;
+            interpreter.v[b_usize] = 4;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 3 + 4);
+            assert_eq!(interpreter.v[b_usize], 4);
+            assert_eq!(interpreter.v[0xf], 0);
+        }
+
+        #[test]
+        fn math_vx_add_vy_with_carry() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AB4;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 255;
+            interpreter.v[b_usize] = 3;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 2);
+            assert_eq!(interpreter.v[b_usize], 3);
+            assert_eq!(interpreter.v[0xf], 1);
         }
     }
 
