@@ -137,7 +137,7 @@ impl Interpreter {
                 let reg = self.v[msb as usize];
                 let byte = two_u8s_to_u16(b, lsb) as u8;
 
-                if (reg == byte) {
+                if reg == byte {
                     self.pc = self.pc + 2;
                 }
             },
@@ -145,13 +145,18 @@ impl Interpreter {
                 let reg = self.v[msb as usize];
                 let byte = two_u8s_to_u16(b, lsb) as u8;
 
-                if (reg != byte) {
+                if reg != byte {
                     self.pc = self.pc + 2;
                 }
             },
             Op::CondVxVyEq(msb, lsb) => {
+                let reg_msb = self.v[msb as usize];
+                let reg_lsb = self.v[lsb as usize];
 
-            }
+                if reg_msb == reg_lsb {
+                    self.pc = self.pc + 2;
+                }
+            },
             _ => unimplemented!()
         }
 
@@ -201,9 +206,9 @@ impl Interpreter {
     /// Test function which initializes the interpreter with an empty file.
     /// We use this so that we can easily run `initialize` in tests.
     fn initialize_with_dummy(&mut self) -> Result<(), Error> {
-        let f = File::create("foo.txt").unwrap();
+        let f = File::create("foo.txt")?;
         self.initialize(f)?;
-        remove_file("foo.txt");
+        remove_file("foo.txt")?;
 
         Ok(())
     }
@@ -226,7 +231,7 @@ impl Interpreter {
 /// Read in a file located at path as a Vec<u8>
 fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf);
+    file.read_to_end(&mut buf)?;
 
     Ok(buf)
 }
@@ -280,6 +285,7 @@ mod interpreter_tests {
 
     mod execute {
         use super::*;
+
         #[test]
         fn display_clear_op() {
             let mut interpreter = Interpreter::new();
@@ -299,7 +305,7 @@ mod interpreter_tests {
         #[test]
         fn return_op() {
             let mut interpreter = Interpreter::new();
-            interpreter.initialize_with_dummy();
+            interpreter.initialize_with_dummy()?;
 
             assert_eq!(interpreter.sp, STACK_START);
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
@@ -392,7 +398,7 @@ mod interpreter_tests {
         }
 
         #[test]
-        fn condvx_ne_op_false() {
+        fn cond_vx_ne_op_false() {
             let mut interpreter = Interpreter::new();
 
             // setup test
@@ -410,7 +416,7 @@ mod interpreter_tests {
         }
 
         #[test]
-        fn condvx_ne_op_true() {
+        fn cond_vx_ne_op_true() {
             let mut interpreter = Interpreter::new();
 
             // setup test
@@ -423,6 +429,48 @@ mod interpreter_tests {
             assert_eq!(interpreter.v[msb_usize], 0);
 
             interpreter.execute(Op::CondVxNe(msb, b, lsb));
+
+            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
+        }
+
+        #[test]
+        fn cond_vx_vy_eq_op_false() {
+            let mut interpreter = Interpreter::new();
+
+            // setup test
+
+            let nibbles = 0xAF0; // arbitrary 3 nibbles
+            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+            interpreter.pc = STARTING_MEMORY_BYTE;
+            let arb_byte = 0xAB;
+
+            interpreter.v[msb_usize] = arb_byte;
+            interpreter.v[b_usize] = 0;
+
+            interpreter.execute(Op::CondVxVyEq(msb, b));
+
+            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+        }
+
+        #[test]
+        fn cond_vx_vy_eq_op_true() {
+            let mut interpreter = Interpreter::new();
+
+            // setup test
+
+            let nibbles = 0xAF0; // arbitrary 3 nibbles
+            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+            interpreter.pc = STARTING_MEMORY_BYTE;
+            let arb_byte = 0xAB;
+
+            interpreter.v[msb_usize] = arb_byte;
+            interpreter.v[b_usize] = arb_byte;
+
+            interpreter.execute(Op::CondVxVyEq(msb, b));
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
         }
