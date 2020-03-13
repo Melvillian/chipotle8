@@ -169,6 +169,16 @@ impl Interpreter {
                 let reg_lsb = self.v[lsb as usize];
                 self.v[msb as usize] = reg_msb | reg_lsb;
             },
+            Op::BitOpAnd(msb, lsb) => {
+                let reg_msb = self.v[msb as usize];
+                let reg_lsb = self.v[lsb as usize];
+                self.v[msb as usize] = reg_msb & reg_lsb;
+            },
+            Op::BitOpXor(msb, lsb) => {
+                let reg_msb = self.v[msb as usize];
+                let reg_lsb = self.v[lsb as usize];
+                self.v[msb as usize] = reg_msb ^ reg_lsb;
+            },
             _ => unimplemented!()
         }
 
@@ -564,6 +574,44 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[msb_usize], 0b11111111);
+            assert_eq!(interpreter.v[b_usize], 0b00110011)
+        }
+
+        #[test]
+        fn bit_and_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AF2;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 0b11001100;
+            interpreter.v[b_usize] = 0b00110011;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 0b00000000);
+            assert_eq!(interpreter.v[b_usize], 0b00110011)
+        }
+
+        #[test]
+        fn bit_xor_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AF3;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 0b11001101;
+            interpreter.v[b_usize] = 0b00110011;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 0b11111110);
             assert_eq!(interpreter.v[b_usize], 0b00110011)
         }
     }
