@@ -1,6 +1,6 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
-use std::path::Path;
+use std::fs::remove_file;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
@@ -43,9 +43,7 @@ mod op;
 pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
 
-    stack: [u16; 16],   // program stack. CHIP 8 can hold up to 16 return addresses
     sp: usize,          // stack pointer, 16 bits are needed but we use usize so we can index with it
-
 
     instr: u16,         // address instruction register
     pc: usize,          // program counter, 16 bits are needed but we use usize so we can index with it
@@ -82,7 +80,6 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             memory: [0; 4096],
-            stack: [0; 16],
             sp: 0,
             instr: 0,
             pc: 0,
@@ -185,20 +182,30 @@ impl Interpreter {
     /// Read in a game file and initialize the necessary registers.
     ///
     /// Returns an error if we fail to open the game file
-    pub fn initialize(&mut self, path: &Path) -> Result<(), Error> {
-        self.read_game_file(path)?;
+    pub fn initialize(&mut self, file: File) -> Result<(), Error> {
+        self.read_game_file(file)?;
         self.sp = STACK_START;
         self.pc = STARTING_MEMORY_BYTE;
 
         Ok(())
     }
 
+    /// Test function which initializes the interpreter with an empty file.
+    /// We use this so that we can easily run `initialize` in tests.
+    fn initialize_with_dummy(&mut self) -> Result<(), Error> {
+        let f = File::create("foo.txt").unwrap();
+        self.initialize(f)?;
+        remove_file("foo.txt");
+
+        Ok(())
+    }
+
 
     /// Read in a CHIP 8 game file and load it into memory starting at byte index 512
-    fn read_game_file(&mut self, path: &Path) -> Result<(), Error> {
-        let buf = read_file_to_vec(path)?;
+    fn read_game_file(&mut self, file: File) -> Result<(), Error> {
+        let buf = read_file_to_vec(file)?;
 
-        let err_msg = format!("file {} is too large", path.to_str().unwrap());
+        let err_msg = format!("file is too large");
         assert!(buf.len() < GAME_FILE_MEMORY_SIZE, err_msg);
 
         let game_file_range = STARTING_MEMORY_BYTE..(STARTING_MEMORY_BYTE + buf.len());
@@ -209,10 +216,9 @@ impl Interpreter {
 }
 
 /// Read in a file located at path as a Vec<u8>
-fn read_file_to_vec(path: &Path) -> Result<Vec<u8>, Error> {
-    let mut f = File::open(path)?;
+fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
     let mut buf = Vec::new();
-    f.read_to_end(&mut buf);
+    file.read_to_end(&mut buf);
 
     Ok(buf)
 }
@@ -256,7 +262,9 @@ fn execute_display_clear() {
 #[test]
 fn execute_return() {
     let mut interpreter = Interpreter::new();
-    assert_eq!(interpreter.sp, 0);
+    interpreter.initialize_with_dummy();
+
+    assert_eq!(interpreter.sp, STACK_START);
     assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
 
     // fake call a function so we set a return address on the stack. We use arbitrary return
@@ -269,7 +277,8 @@ fn execute_return() {
 
     interpreter.execute(Op::Return);
 
-    assert_eq!(interpreter.sp as u16, two_u8s_to_u16(0x01, 0xAA));
+    assert_eq!(interpreter.pc, two_u8s_to_usize(0x01, 0xAA));
+    assert_eq!(interpreter.sp, STACK_START);
 }
 
 #[test]
