@@ -221,6 +221,19 @@ impl Interpreter {
                 self.v[0xf] = (reg_val & 0b10000000) >> 7; // set VF to the value of the msb
                 self.v[reg_usize] = self.v[reg_usize] << 1;
             },
+            Op::MathVyMinusVx(msb, lsb) => {
+                let msb_reg = self.v[msb as usize];
+                let lsb_reg = self.v[lsb as usize];
+
+                let (val, did_overflow) = lsb_reg.overflowing_sub(msb_reg);
+                self.v[msb as usize] = val;
+
+                if did_overflow {
+                    self.v[0xf] = 0;
+                } else {
+                    self.v[0xf] = 1;
+                }
+            }
             _ => unimplemented!()
         }
 
@@ -780,6 +793,46 @@ mod interpreter_tests {
             interpreter.execute(op2);
 
             assert_eq!(interpreter.v[msb_usize], 0b00001000);
+            assert_eq!(interpreter.v[0xf], 0);
+        }
+
+        #[test]
+        fn math_vx_eq_vy_minus_vx_no_borrow() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AB7;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 3;
+            interpreter.v[b_usize] = 4;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 1);
+            assert_eq!(interpreter.v[b_usize],4);
+            assert_eq!(interpreter.v[0xf], 1);
+        }
+
+        #[test]
+        fn math_vx_eq_vy_minus_vx_borrow() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AB7;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 2;
+            interpreter.v[b_usize] = 1;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 255);
+            assert_eq!(interpreter.v[b_usize], 1);
             assert_eq!(interpreter.v[0xf], 0);
         }
     }
