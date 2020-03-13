@@ -1,6 +1,5 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
-use std::fs::remove_file;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
@@ -166,6 +165,10 @@ impl Interpreter {
                 let byte = two_nibbles_to_u16(b, lsb) as u8;
                 self.v[msb as usize] = self.v[msb as usize] + byte;
             },
+            Op::AssignVyToVx(msb, lsb) => {
+                let reg_lsb = self.v[lsb as usize];
+                self.v[msb as usize] = reg_lsb;
+            }
             _ => unimplemented!()
         }
 
@@ -524,6 +527,25 @@ mod interpreter_tests {
 
             let eight_bits = two_nibbles_to_u16(b, lsb) as u8;
             assert_eq!(interpreter.v[msb_usize], (eight_bits + offset) as u8);
+        }
+
+        #[test]
+        fn assign_vx_vy_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AF0;
+            let op = Op::from(instr as u16);
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 42;
+            interpreter.v[b_usize] = 24;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 24);
+            assert_eq!(interpreter.v[msb_usize], interpreter.v[b_usize])
         }
     }
 
