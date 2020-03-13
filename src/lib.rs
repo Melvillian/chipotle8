@@ -202,11 +202,25 @@ impl Interpreter {
                 self.v[msb as usize] = val;
 
                 if (did_overflow) {
-                    self.v[0xf] = 1;
-                } else {
                     self.v[0xf] = 0;
+                } else {
+                    self.v[0xf] = 1;
                 }
-            }
+            },
+            Op::BitOpRtShift(reg_idx) => {
+                let reg_usize = reg_idx as usize;
+                let reg_val = self.v[reg_usize];
+
+                self.v[0xf] = reg_val & 0b1; // set VF to the value of the lsb
+                self.v[reg_usize] = self.v[reg_usize] >> 1;
+            },
+            Op::BitOpLftShift(reg_idx) => {
+                let reg_usize = reg_idx as usize;
+                let reg_val = self.v[reg_usize];
+
+                self.v[0xf] = (reg_val & 0b10000000) >> 7; // set VF to the value of the msb
+                self.v[reg_usize] = self.v[reg_usize] << 1;
+            },
             _ => unimplemented!()
         }
 
@@ -700,7 +714,7 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.v[msb_usize], 1);
             assert_eq!(interpreter.v[b_usize],3);
-            assert_eq!(interpreter.v[0xf], 0);
+            assert_eq!(interpreter.v[0xf], 1);
         }
 
         #[test]
@@ -720,7 +734,53 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.v[msb_usize], 255);
             assert_eq!(interpreter.v[b_usize], 2);
+            assert_eq!(interpreter.v[0xf], 0);
+        }
+
+        #[test]
+        fn bit_right_shift_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AB6;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+
+            interpreter.v[msb_usize] = 0b10000010;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 0b01000001);
+            assert_eq!(interpreter.v[0xf], 0);
+
+            let op2 = Op::from(instr as u16);
+            interpreter.execute(op2);
+
+            assert_eq!(interpreter.v[msb_usize], 0b00100000);
             assert_eq!(interpreter.v[0xf], 1);
+        }
+
+        #[test]
+        fn bit_left_shift_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8ABE;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+
+            interpreter.v[msb_usize] = 0b10000010;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 0b00000100);
+            assert_eq!(interpreter.v[0xf], 1);
+
+            let op2 = Op::from(instr as u16);
+            interpreter.execute(op2);
+
+            assert_eq!(interpreter.v[msb_usize], 0b00001000);
+            assert_eq!(interpreter.v[0xf], 0);
         }
     }
 

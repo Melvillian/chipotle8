@@ -38,9 +38,9 @@ pub enum Op {
     BitOpXor(u8, u8),
     MathVxAddVy(u8, u8),
     MathVxMinusVy(u8, u8),
-    BitOpRtShift(u8, u8),
+    BitOpRtShift(u8),
     MathVyMinusVx(u8, u8),
-    BitOpLftShift(u8, u8),
+    BitOpLftShift(u8),
 
     // 9XXX
     CondVxVyNe(u8, u8),
@@ -109,9 +109,9 @@ impl From<u16> for Op {
                     0x3       => Op::BitOpXor(n2, n3),
                     0x4       => Op::MathVxAddVy(n2, n3),
                     0x5       => Op::MathVxMinusVy(n2, n3),
-                    0x6       => Op::BitOpRtShift(n2, n3),
+                    0x6       => Op::BitOpRtShift(n2),
                     0x7       => Op::MathVyMinusVx(n2, n3),
-                    0xE       => Op::BitOpLftShift(n2, n3),
+                    0xE       => Op::BitOpLftShift(n2),
                     _ => panic!(panic_msg),
                 }
             },
@@ -202,13 +202,13 @@ mod tests {
         assert_eq!(Op::from(op_num), Op::MathVxMinusVy(0xF, 0xA));
 
         op_num = 0x8FA6;
-        assert_eq!(Op::from(op_num), Op::BitOpRtShift(0xF, 0xA));
+        assert_eq!(Op::from(op_num), Op::BitOpRtShift(0xF));
 
         op_num = 0x8FA7;
         assert_eq!(Op::from(op_num), Op::MathVyMinusVx(0xF, 0xA));
 
         op_num = 0x8FAE;
-        assert_eq!(Op::from(op_num), Op::BitOpLftShift(0xF, 0xA));
+        assert_eq!(Op::from(op_num), Op::BitOpLftShift(0xF));
 
         op_num = 0x9FA0;
         assert_eq!(Op::from(op_num), Op::CondVxVyNe(0xF, 0xA));
@@ -262,28 +262,28 @@ mod tests {
     #[test]
     #[should_panic]
     fn panic_convert_opcodes_8() {
-        let mut op_num = 0x8DEF;
+        let op_num = 0x8DEF;
         Op::from(op_num);
     }
 
     #[test]
     #[should_panic]
     fn panic_convert_opcodes_9() {
-        let mut op_num = 0x9DEF;
+        let op_num = 0x9DEF;
         Op::from(op_num);
     }
 
     #[test]
     #[should_panic]
     fn panic_convert_opcodes_e() {
-        let mut op_num = 0xED9F;
+        let op_num = 0xED9F;
         Op::from(op_num);
     }
 
     #[test]
     #[should_panic]
     fn panic_convert_opcodes_f() {
-        let mut op_num = 0xFDEF;
+        let op_num = 0xFDEF;
         Op::from(op_num);
     }
 }
