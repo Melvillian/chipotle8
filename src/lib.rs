@@ -161,7 +161,11 @@ impl Interpreter {
             Op::ConstSetVx(msb, b, lsb) => {
                 let byte = two_nibbles_to_u16(b, lsb) as u8;
                 self.v[msb as usize] = byte;
-            }
+            },
+            Op::ConstAddVx(msb, b, lsb) => {
+                let byte = two_nibbles_to_u16(b, lsb) as u8;
+                self.v[msb as usize] = self.v[msb as usize] + byte;
+            },
             _ => unimplemented!()
         }
 
@@ -487,7 +491,7 @@ mod interpreter_tests {
         }
 
         #[test]
-        fn const_vx_plus_op() {
+        fn const_vx_set_op() {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0x6AFB;
@@ -501,7 +505,25 @@ mod interpreter_tests {
 
             let eight_bits = two_nibbles_to_u16(b, lsb);
             assert_eq!(interpreter.v[msb_usize], eight_bits as u8);
+        }
 
+        #[test]
+        fn const_vx_plus_set_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x7AFB;
+            let op = Op::from(instr as u16);
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+
+            let offset = 1; // set vA to something other than 0 so we can make sure 0xFB gets added
+            interpreter.v[msb_usize] = offset;
+            assert_eq!(interpreter.v[msb_usize], offset);
+
+            interpreter.execute(op);
+
+            let eight_bits = two_nibbles_to_u16(b, lsb) as u8;
+            assert_eq!(interpreter.v[msb_usize], (eight_bits + offset) as u8);
         }
     }
 
