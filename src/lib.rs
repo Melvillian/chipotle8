@@ -62,11 +62,6 @@ pub struct Interpreter {
     font_set: [[u8; 5]; 2],  // stores the 16 5-byte hex font set
 }
 
-#[macro_export]
-macro_rules! reg {
-    ($i:literal) => (self.v$i);
-}
-
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
@@ -168,7 +163,12 @@ impl Interpreter {
             Op::AssignVyToVx(msb, lsb) => {
                 let reg_lsb = self.v[lsb as usize];
                 self.v[msb as usize] = reg_lsb;
-            }
+            },
+            Op::BitOpOr(msb, lsb) => {
+                let reg_msb = self.v[msb as usize];
+                let reg_lsb = self.v[lsb as usize];
+                self.v[msb as usize] = reg_msb | reg_lsb;
+            },
             _ => unimplemented!()
         }
 
@@ -535,7 +535,7 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AF0;
             let op = Op::from(instr as u16);
-            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
             let b_usize = b as usize;
 
@@ -546,6 +546,25 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.v[msb_usize], 24);
             assert_eq!(interpreter.v[msb_usize], interpreter.v[b_usize])
+        }
+
+        #[test]
+        fn bit_or_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x8AF1;
+            let op = Op::from(instr as u16);
+            let (msb, b, _) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+            let b_usize = b as usize;
+
+            interpreter.v[msb_usize] = 0b11001100;
+            interpreter.v[b_usize] = 0b00110011;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[msb_usize], 0b11111111);
+            assert_eq!(interpreter.v[b_usize], 0b00110011)
         }
     }
 
