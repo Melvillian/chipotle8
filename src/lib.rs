@@ -43,7 +43,9 @@ mod op;
 pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
 
-    sp: usize,          // stack pointer, 16 bits are needed but we use usize so we can index with it
+    sp: usize,          // stack pointer, 16 bits are needed but we use usize so we can index with it.
+                        // The stack pointer always points on beyond the top of the stack, i.e. onto
+                        // unallocated memory
 
     instr: u16,         // address instruction register
     pc: usize,          // program counter, 16 bits are needed but we use usize so we can index with it
@@ -142,7 +144,19 @@ impl Interpreter {
                 self.pc = instr;
             },
             Op::Goto(msb, b, lsb) => {
+                let instr = three_u8s_to_usize(msb, b, lsb);
+                self.pc = instr;
+            },
+            Op::GotoSubRtn(msb, b, lsb) => {
+                // save the current instruction for when the subroutine returns;
+                let (pc_msb, pc_lsb) = usize_to_two_u8s(self.pc);
+                self.memory[self.sp] = pc_msb;
+                self.sp = self.sp + 1;
+                self.memory[self.sp] = pc_lsb;
+                self.sp = self.sp + 1;
 
+                // jump to the subroutine
+                self.pc = three_u8s_to_usize(msb, b, lsb);
             }
             _ => unimplemented!()
         }
@@ -234,6 +248,15 @@ fn two_u8s_to_usize(msb: u8, lsb: u8) -> usize {
     two_u8s_to_u16(msb, lsb) as usize
 }
 
+fn usize_to_two_u8s(u: usize) -> (u8, u8) {
+    let mask: usize = 0xF;
+
+    let msb = ((u >> 4) & mask) as u8;
+    let lsb = (u & mask) as u8;
+
+    (msb, lsb)
+}
+
 /// Take the msb, middle byte and lsb u8s and merge them into a single 16. Used
 /// to convert three 4-bit pieces of data in memory into a single 16-bit
 /// instruction.
@@ -241,61 +264,126 @@ fn three_u8s_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | ((b as u16) << 4) | (lsb as u16)
 }
 
+fn three_u8s_to_usize(msb: u8, b: u8, lsb: u8) -> usize {
+    three_u8s_to_u16(msb, b, lsb) as usize
+}
+
+fn usize_to_three_u8s(u: usize) -> (u8, u8, u8) {
+    let mask: usize = 0xF;
+
+    let msb = ((u >> 8) & mask) as u8;
+    let b = ((u >> 4) & mask) as u8;
+    let lsb = (u & mask) as u8;
+
+    (msb, b, lsb)
+}
 
 
-#[test]
-fn execute_display_clear() {
-    let mut interpreter = Interpreter::new();
-    assert_eq!(interpreter.vf, 0);
 
-    interpreter.execute(Op::DispClear);
-    for i in 0..interpreter.graphics.len() {
-        assert_eq!(interpreter.graphics[i], 0);
+#[cfg(test)]
+mod interpreter {
+    use super::*;
+
+    mod execute {
+        use super::*;
+        #[test]
+        fn display_clear_op() {
+            let mut interpreter = Interpreter::new();
+            assert_eq!(interpreter.vf, 0);
+
+            interpreter.execute(Op::DispClear);
+            for i in 0..interpreter.graphics.len() {
+                assert_eq!(interpreter.graphics[i], 0);
+            }
+            assert_eq!(interpreter.vf, 0);
+
+            interpreter.graphics[0] = 1;
+            interpreter.execute(Op::DispClear);
+            assert_eq!(interpreter.vf, 1);
+        }
+
+        #[test]
+        fn return_op() {
+            let mut interpreter = Interpreter::new();
+            interpreter.initialize_with_dummy();
+
+            assert_eq!(interpreter.sp, STACK_START);
+            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+
+            // fake call a function so we set a return address on the stack. We use arbitrary return
+            // address 0x01AA
+            interpreter.memory[interpreter.sp] = 0x01;
+            interpreter.sp = interpreter.sp + 1;
+
+            interpreter.memory[interpreter.sp] = 0xAA;
+            interpreter.sp = interpreter.sp + 1;
+
+            interpreter.execute(Op::Return);
+
+            assert_eq!(interpreter.pc, two_u8s_to_usize(0x01, 0xAA));
+            assert_eq!(interpreter.sp, STACK_START);
+
+            assert_eq!(interpreter.memory[interpreter.sp], 0);
+            assert_eq!(interpreter.memory[interpreter.sp + 1], 0);
+            assert_eq!(interpreter.memory[interpreter.sp + 2], 0);
+        }
+
+        #[test]
+        fn goto_op() {
+            let mut interpreter = Interpreter::new();
+            assert_eq!(interpreter.pc, 0);
+
+            let instr = 0xFAB;
+            let (msb, b, lsb) = usize_to_three_u8s(instr);
+            interpreter.execute(Op::Goto(msb, b, lsb));
+
+            assert_eq!(interpreter.pc, instr);
+        }
+
+        #[test]
+        fn call_subroutine_op() {
+            assert_eq!(interpreter.pc, 0);
+            assert_eq!(interpreter.sp, 0);
+
+            // fake the interpreter in the middle of execution by setting pc to arbitrary address
+            let arb_addr = 0xFAB;
+            interpreter.pc = arb_addr;
+
+            let instr = 0xDEF;
+            let (msb, b, lsb) = usize_to_three_u8s(instr);
+            interpreter.execute(Op::GotoSubRtn(msb, b, lsb));
+
+            assert_eq!(interpreter.pc, instr);
+            assert_eq!(interpreter.sp, 2);
+            let (msb, lsb) = usize_to_two_u8s(arb_addr);
+            assert_eq!(interpreter.memory[interpreter.sp - 1], lsb);
+            assert_eq!(interpreter.memory[interpreter.sp - 2], msb);
+        }
+
+        #[test]
+        fn cond_vx_eq_op() {
+            let mut interpreter = Interpreter::new();
+            g
+        }
     }
-    assert_eq!(interpreter.vf, 0);
 
-    interpreter.graphics[0] = 1;
-    interpreter.execute(Op::DispClear);
-    assert_eq!(interpreter.vf, 1);
+    #[test]
+    fn two_u8s_to_16_test() {
+        let n1 = 0x0;
+        let n2 = 0xF;
+
+        let expected: u16 = 0x0F;
+        assert_eq!(expected, two_u8s_to_u16(n1, n2));
+    }
+
+    #[test]
+    fn three_u8s_to_16_test() {
+        let n1 = 0x0;
+        let n2 = 0xF;
+        let n3 = 0xA;
+
+        let expected: u16 = 0x0FA;
+        assert_eq!(expected, three_u8s_to_u16(n1, n2, n3));
+    }
 }
 
-#[test]
-fn execute_return() {
-    let mut interpreter = Interpreter::new();
-    interpreter.initialize_with_dummy();
-
-    assert_eq!(interpreter.sp, STACK_START);
-    assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
-
-    // fake call a function so we set a return address on the stack. We use arbitrary return
-    // address 0x01AA
-    interpreter.memory[interpreter.sp] = 0x01;
-    interpreter.sp = interpreter.sp + 1;
-
-    interpreter.memory[interpreter.sp] = 0xAA;
-    interpreter.sp = interpreter.sp + 1;
-
-    interpreter.execute(Op::Return);
-
-    assert_eq!(interpreter.pc, two_u8s_to_usize(0x01, 0xAA));
-    assert_eq!(interpreter.sp, STACK_START);
-}
-
-#[test]
-fn two_u8s_to_16_test() {
-    let n1 = 0x0;
-    let n2 = 0xF;
-
-    let expected: u16 = 0x0F;
-    assert_eq!(expected, two_u8s_to_u16(n1, n2));
-}
-
-#[test]
-fn three_u8s_to_16_test() {
-    let n1 = 0x0;
-    let n2 = 0xF;
-    let n3 = 0xA;
-
-    let expected: u16 = 0x0FA;
-    assert_eq!(expected, three_u8s_to_u16(n1, n2, n3));
-}
