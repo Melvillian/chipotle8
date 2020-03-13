@@ -114,28 +114,29 @@ impl Interpreter {
                 let msb = self.memory[self.sp];
                 self.memory[self.sp] = 0; // zero out stack
 
-                let instr = two_u8s_to_usize(msb, lsb);
+                let instr = two_nibbles_to_usize(msb, lsb);
 
                 self.pc = instr;
+
             },
             Op::Goto(msb, b, lsb) => {
-                let instr = three_u8s_to_usize(msb, b, lsb);
+                let instr = three_nibbles_to_usize(msb, b, lsb);
                 self.pc = instr;
             },
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
-                let (pc_msb, pc_lsb) = usize_to_two_u8s(self.pc);
+                let (pc_msb, pc_lsb) = usize_to_two_nibbles(self.pc);
                 self.memory[self.sp] = pc_msb;
                 self.sp = self.sp + 1;
                 self.memory[self.sp] = pc_lsb;
                 self.sp = self.sp + 1;
 
                 // jump to the subroutine
-                self.pc = three_u8s_to_usize(msb, b, lsb);
+                self.pc = three_nibbles_to_usize(msb, b, lsb);
             },
             Op::CondVxEq(msb, b, lsb) => {
                 let reg = self.v[msb as usize];
-                let byte = two_u8s_to_u16(b, lsb) as u8;
+                let byte = two_nibbles_to_u16(b, lsb) as u8;
 
                 if reg == byte {
                     self.pc = self.pc + 2;
@@ -143,7 +144,7 @@ impl Interpreter {
             },
             Op::CondVxNe(msb, b, lsb) => {
                 let reg = self.v[msb as usize];
-                let byte = two_u8s_to_u16(b, lsb) as u8;
+                let byte = two_nibbles_to_u16(b, lsb) as u8;
 
                 if reg != byte {
                     self.pc = self.pc + 2;
@@ -180,7 +181,7 @@ impl Interpreter {
         let lsb = self.memory[self.pc as usize];
         self.pc = self.pc + 1;
 
-        let instr = two_u8s_to_u16(msb, lsb);
+        let instr = two_nibbles_to_u16(msb, lsb);
         let op = Op::from(instr);
 
         self.execute(op);
@@ -202,17 +203,6 @@ impl Interpreter {
 
         Ok(())
     }
-
-    /// Test function which initializes the interpreter with an empty file.
-    /// We use this so that we can easily run `initialize` in tests.
-    fn initialize_with_dummy(&mut self) -> Result<(), Error> {
-        let f = File::create("foo.txt")?;
-        self.initialize(f)?;
-        remove_file("foo.txt")?;
-
-        Ok(())
-    }
-
 
     /// Read in a CHIP 8 game file and load it into memory starting at byte index 512
     fn read_game_file(&mut self, file: File) -> Result<(), Error> {
@@ -239,15 +229,15 @@ fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
 /// Take the msb and lsb u8s and merge them into a single 16. Used
 /// to convert two 8-bit pieces of data in memory into a single 16-bit
 /// instruction.
-fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
+fn two_nibbles_to_u16(msb: u8, lsb: u8) -> u16 {
     ((msb as u16) << 4) | (lsb as u16)
 }
 
-fn two_u8s_to_usize(msb: u8, lsb: u8) -> usize {
-    two_u8s_to_u16(msb, lsb) as usize
+fn two_nibbles_to_usize(msb: u8, lsb: u8) -> usize {
+    two_nibbles_to_u16(msb, lsb) as usize
 }
 
-fn usize_to_two_u8s(u: usize) -> (u8, u8) {
+fn usize_to_two_nibbles(u: usize) -> (u8, u8) {
     let mask: usize = 0xF;
 
     let msb = ((u >> 4) & mask) as u8;
@@ -259,15 +249,15 @@ fn usize_to_two_u8s(u: usize) -> (u8, u8) {
 /// Take the msb, middle byte and lsb u8s and merge them into a single 16. Used
 /// to convert three 4-bit pieces of data in memory into a single 16-bit
 /// instruction.
-fn three_u8s_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
+fn three_nibbles_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | ((b as u16) << 4) | (lsb as u16)
 }
 
-fn three_u8s_to_usize(msb: u8, b: u8, lsb: u8) -> usize {
-    three_u8s_to_u16(msb, b, lsb) as usize
+fn three_nibbles_to_usize(msb: u8, b: u8, lsb: u8) -> usize {
+    three_nibbles_to_u16(msb, b, lsb) as usize
 }
 
-fn usize_to_three_u8s(u: usize) -> (u8, u8, u8) {
+fn usize_to_three_nibbles(u: usize) -> (u8, u8, u8) {
     let mask: usize = 0xF;
 
     let msb = ((u >> 8) & mask) as u8;
@@ -291,7 +281,10 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
             assert_eq!(interpreter.v[0xf], 0);
 
-            interpreter.execute(Op::DispClear);
+            let instr = 0x00E0;
+            let op = Op::from(instr);
+            interpreter.execute(op);
+
             for i in 0..interpreter.graphics.len() {
                 assert_eq!(interpreter.graphics[i], 0);
             }
@@ -305,27 +298,31 @@ mod interpreter_tests {
         #[test]
         fn return_op() {
             let mut interpreter = Interpreter::new();
-            interpreter.initialize_with_dummy()?;
 
-            assert_eq!(interpreter.sp, STACK_START);
-            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+            assert_eq!(interpreter.sp, 0);
+            assert_eq!(interpreter.pc, 0);
 
             // fake call a function so we set a return address on the stack. We use arbitrary return
             // address 0x01AA
-            interpreter.memory[interpreter.sp] = 0x01;
+            let arb_addr = 0x001A;
+            let (msb, lsb) = usize_to_two_nibbles(arb_addr);
+            interpreter.memory[interpreter.sp] = msb;
             interpreter.sp = interpreter.sp + 1;
 
-            interpreter.memory[interpreter.sp] = 0xAA;
+            interpreter.memory[interpreter.sp] = lsb;
             interpreter.sp = interpreter.sp + 1;
 
-            interpreter.execute(Op::Return);
+            interpreter.pc = 0x090B; // arbitrary position for the program counter
 
-            assert_eq!(interpreter.pc, two_u8s_to_usize(0x01, 0xAA));
-            assert_eq!(interpreter.sp, STACK_START);
+            let instr = 0x00EE;
+            let op = Op::from(instr);
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc, arb_addr);
+            assert_eq!(interpreter.sp, 0);
 
             assert_eq!(interpreter.memory[interpreter.sp], 0);
             assert_eq!(interpreter.memory[interpreter.sp + 1], 0);
-            assert_eq!(interpreter.memory[interpreter.sp + 2], 0);
         }
 
         #[test]
@@ -333,11 +330,13 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
             assert_eq!(interpreter.pc, 0);
 
-            let instr = 0xFAB;
-            let (msb, b, lsb) = usize_to_three_u8s(instr);
-            interpreter.execute(Op::Goto(msb, b, lsb));
+            let instr: usize = 0x1FAB;
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let addr = three_nibbles_to_usize(msb, b, lsb);
+            let op = Op::from(instr as u16);
+            interpreter.execute(op);
 
-            assert_eq!(interpreter.pc, instr);
+            assert_eq!(interpreter.pc, addr);
         }
 
         #[test]
@@ -350,13 +349,14 @@ mod interpreter_tests {
             let arb_addr = 0xFAB;
             interpreter.pc = arb_addr;
 
-            let instr = 0xDEF;
-            let (msb, b, lsb) = usize_to_three_u8s(instr);
-            interpreter.execute(Op::GotoSubRtn(msb, b, lsb));
+            let instr = 0x2DEF;
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let addr = three_nibbles_to_usize(msb, b, lsb);
+            interpreter.execute(Op::from(instr as u16));
 
-            assert_eq!(interpreter.pc, instr);
+            assert_eq!(interpreter.pc, addr);
             assert_eq!(interpreter.sp, 2);
-            let (msb, lsb) = usize_to_two_u8s(arb_addr);
+            let (msb, lsb) = usize_to_two_nibbles(arb_addr);
             assert_eq!(interpreter.memory[interpreter.sp - 1], lsb);
             assert_eq!(interpreter.memory[interpreter.sp - 2], msb);
         }
@@ -367,14 +367,15 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xAAB; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let instr = 0x3AAB;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
 
             assert_eq!(interpreter.v[msb_usize], 0);
 
-            interpreter.execute(Op::CondVxEq(msb, b, lsb));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
         }
@@ -385,14 +386,15 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xA00; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let instr = 0x3A00;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
 
             assert_eq!(interpreter.v[msb_usize], 0);
 
-            interpreter.execute(Op::CondVxEq(msb, b, lsb));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
         }
@@ -403,14 +405,16 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xA00; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+
+            let instr = 0x4A00;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
 
             assert_eq!(interpreter.v[msb_usize], 0);
 
-            interpreter.execute(Op::CondVxNe(msb, b, lsb));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
         }
@@ -421,14 +425,15 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xAFB; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let instr = 0x4AFB;
+            let op = Op::from(instr as u16);
+            let (msb, _, _) = usize_to_three_nibbles(instr);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
 
             assert_eq!(interpreter.v[msb_usize], 0);
 
-            interpreter.execute(Op::CondVxNe(msb, b, lsb));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
         }
@@ -439,8 +444,9 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xAF0; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let nibbles = 0x5AF0; // arbitrary 3 nibbles
+            let op = Op::from(nibbles as u16);
+            let (msb, b, _) = usize_to_three_nibbles(nibbles);
             let msb_usize = msb as usize;
             let b_usize = b as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
@@ -449,7 +455,7 @@ mod interpreter_tests {
             interpreter.v[msb_usize] = arb_byte;
             interpreter.v[b_usize] = 0;
 
-            interpreter.execute(Op::CondVxVyEq(msb, b));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
         }
@@ -460,8 +466,9 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xAF0; // arbitrary 3 nibbles
-            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let nibbles = 0x5AF0; // arbitrary 3 nibbles
+            let op = Op::from(nibbles as u16);
+            let (msb, b, _) = usize_to_three_nibbles(nibbles);
             let msb_usize = msb as usize;
             let b_usize = b as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
@@ -470,7 +477,7 @@ mod interpreter_tests {
             interpreter.v[msb_usize] = arb_byte;
             interpreter.v[b_usize] = arb_byte;
 
-            interpreter.execute(Op::CondVxVyEq(msb, b));
+            interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
         }
@@ -482,7 +489,7 @@ mod interpreter_tests {
         let n2 = 0xF;
 
         let expected: u16 = 0x0F;
-        assert_eq!(expected, two_u8s_to_u16(n1, n2));
+        assert_eq!(expected, two_nibbles_to_u16(n1, n2));
     }
 
     #[test]
@@ -492,7 +499,7 @@ mod interpreter_tests {
         let n3 = 0xA;
 
         let expected: u16 = 0x0FA;
-        assert_eq!(expected, three_u8s_to_u16(n1, n2, n3));
+        assert_eq!(expected, three_nibbles_to_u16(n1, n2, n3));
     }
 }
 
