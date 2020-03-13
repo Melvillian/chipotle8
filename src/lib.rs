@@ -140,6 +140,17 @@ impl Interpreter {
                 if (reg == byte) {
                     self.pc = self.pc + 2;
                 }
+            },
+            Op::CondVxNe(msb, b, lsb) => {
+                let reg = self.v[msb as usize];
+                let byte = two_u8s_to_u16(b, lsb) as u8;
+
+                if (reg != byte) {
+                    self.pc = self.pc + 2;
+                }
+            },
+            Op::CondVxVyEq(msb, lsb) => {
+
             }
             _ => unimplemented!()
         }
@@ -350,7 +361,7 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xFAB; // arbitrary 3 nibbles
+            let nibbles = 0xAAB; // arbitrary 3 nibbles
             let (msb, b, lsb) = usize_to_three_u8s(nibbles);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
@@ -368,7 +379,7 @@ mod interpreter_tests {
 
             // setup test
 
-            let nibbles = 0xF00; // arbitrary 3 nibbles
+            let nibbles = 0xA00; // arbitrary 3 nibbles
             let (msb, b, lsb) = usize_to_three_u8s(nibbles);
             let msb_usize = msb as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
@@ -376,6 +387,42 @@ mod interpreter_tests {
             assert_eq!(interpreter.v[msb_usize], 0);
 
             interpreter.execute(Op::CondVxEq(msb, b, lsb));
+
+            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
+        }
+
+        #[test]
+        fn condvx_ne_op_false() {
+            let mut interpreter = Interpreter::new();
+
+            // setup test
+
+            let nibbles = 0xA00; // arbitrary 3 nibbles
+            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let msb_usize = msb as usize;
+            interpreter.pc = STARTING_MEMORY_BYTE;
+
+            assert_eq!(interpreter.v[msb_usize], 0);
+
+            interpreter.execute(Op::CondVxNe(msb, b, lsb));
+
+            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+        }
+
+        #[test]
+        fn condvx_ne_op_true() {
+            let mut interpreter = Interpreter::new();
+
+            // setup test
+
+            let nibbles = 0xAFB; // arbitrary 3 nibbles
+            let (msb, b, lsb) = usize_to_three_u8s(nibbles);
+            let msb_usize = msb as usize;
+            interpreter.pc = STARTING_MEMORY_BYTE;
+
+            assert_eq!(interpreter.v[msb_usize], 0);
+
+            interpreter.execute(Op::CondVxNe(msb, b, lsb));
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
         }
