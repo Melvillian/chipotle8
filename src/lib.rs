@@ -158,6 +158,10 @@ impl Interpreter {
                     self.pc = self.pc + 2;
                 }
             },
+            Op::ConstSetVx(msb, b, lsb) => {
+                let byte = two_nibbles_to_u16(b, lsb) as u8;
+                self.v[msb as usize] = byte;
+            }
             _ => unimplemented!()
         }
 
@@ -480,6 +484,24 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
+        }
+
+        #[test]
+        fn const_vx_plus_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x6AFB;
+            let op = Op::from(instr as u16);
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let msb_usize = msb as usize;
+
+            assert_eq!(interpreter.v[msb_usize], 0);
+
+            interpreter.execute(op);
+
+            let eight_bits = two_nibbles_to_u16(b, lsb);
+            assert_eq!(interpreter.v[msb_usize], eight_bits as u8);
+
         }
     }
 
