@@ -2,11 +2,15 @@
 #[derive(Debug, PartialOrd, PartialEq)]
 pub enum Op {
     // 0XXX
+    // 0NNN 	Call 		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
     CallRca(u8, u8, u8),
+    // 00E0 	Display 	disp_clear() 	Clears the screen.
     DispClear,
+    // 00EE 	Flow 	return; 	Returns from a subroutine.
     Return,
 
     // 1XXX
+    // 1NNN 	Flow 	goto NNN; 	Jumps to address NNN.
     Goto(u8, u8, u8),
 
     // 2XXX

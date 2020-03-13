@@ -44,11 +44,11 @@ pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
 
     stack: [u16; 16],   // program stack. CHIP 8 can hold up to 16 return addresses
-    sp: u16,            // stack pointer
+    sp: usize,          // stack pointer, 16 bits are needed but we use usize so we can index with it
 
 
     instr: u16,         // address instruction register
-    pc: u16,            // program counter
+    pc: usize,          // program counter, 16 bits are needed but we use usize so we can index with it
 
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
     v0: u8,
@@ -116,6 +116,39 @@ impl Interpreter {
 
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
+        match op {
+            Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
+            Op::DispClear => {
+                let mut set_vf: bool = false;
+                for i in 0..self.graphics.len() {
+                    if 0u8 ^ self.graphics[i] == 1 {
+                        set_vf = true;
+                    }
+                    self.graphics[i] = 0;
+                }
+
+                if set_vf {
+                    self.vf = 1;
+                }
+            },
+            Op::Return => {
+                self.sp = self.sp - 1;
+                let lsb = self.memory[self.sp];
+                self.memory[self.sp] = 0; // zero out stack
+
+                self.sp = self.sp - 1;
+                let msb = self.memory[self.sp];
+                self.memory[self.sp] = 0; // zero out stack
+
+                let instr = two_u8s_to_usize(msb, lsb);
+
+                self.pc = instr;
+            },
+            Op::Goto(msb, b, lsb) => {
+
+            }
+            _ => unimplemented!()
+        }
 
     }
 
@@ -125,7 +158,7 @@ impl Interpreter {
     }
 
     /// Check for any changes to keyboard input (keys pressed or unpressed)
-    fn updateKeyInputs(&mut self) {
+    fn update_key_inputs(&mut self) {
 
     }
 
@@ -137,7 +170,7 @@ impl Interpreter {
         let lsb = self.memory[self.pc as usize];
         self.pc = self.pc + 1;
 
-        let instr = two_u8s_to_16(msb, lsb);
+        let instr = two_u8s_to_u16(msb, lsb);
         let op = Op::from(instr);
 
         self.execute(op);
@@ -146,7 +179,7 @@ impl Interpreter {
             self.draw();
         }
 
-        self.updateKeyInputs();
+        self.update_key_inputs();
     }
 
     /// Read in a game file and initialize the necessary registers.
@@ -154,8 +187,8 @@ impl Interpreter {
     /// Returns an error if we fail to open the game file
     pub fn initialize(&mut self, path: &Path) -> Result<(), Error> {
         self.read_game_file(path)?;
-        self.sp = STACK_START as u16;
-        self.pc = STARTING_MEMORY_BYTE as u16;
+        self.sp = STACK_START;
+        self.pc = STARTING_MEMORY_BYTE;
 
         Ok(())
     }
@@ -187,18 +220,73 @@ fn read_file_to_vec(path: &Path) -> Result<Vec<u8>, Error> {
 /// Take the msb and lsb u8s and merge them into a single 16. Used
 /// to convert two 8-bit pieces of data in memory into a single 16-bit
 /// instruction.
-fn two_u8s_to_16(msb: u8, lsb: u8) -> u16 {
-    ((msb as u16) << 8) | (lsb as u16)
+fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 4) | (lsb as u16)
+}
+
+fn two_u8s_to_usize(msb: u8, lsb: u8) -> usize {
+    two_u8s_to_u16(msb, lsb) as usize
+}
+
+/// Take the msb, middle byte and lsb u8s and merge them into a single 16. Used
+/// to convert three 4-bit pieces of data in memory into a single 16-bit
+/// instruction.
+fn three_u8s_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 8) | ((b as u16) << 4) | (lsb as u16)
 }
 
 
-/*
- # PLAN
- * make cpu instructions enum
- * write tick function
-     - write handlers for each instruction
- * create cpu struct with defaults
-     - write function to zero the cpu
-     -
- * write register getter macro
-*/
+
+#[test]
+fn execute_display_clear() {
+    let mut interpreter = Interpreter::new();
+    assert_eq!(interpreter.vf, 0);
+
+    interpreter.execute(Op::DispClear);
+    for i in 0..interpreter.graphics.len() {
+        assert_eq!(interpreter.graphics[i], 0);
+    }
+    assert_eq!(interpreter.vf, 0);
+
+    interpreter.graphics[0] = 1;
+    interpreter.execute(Op::DispClear);
+    assert_eq!(interpreter.vf, 1);
+}
+
+#[test]
+fn execute_return() {
+    let mut interpreter = Interpreter::new();
+    assert_eq!(interpreter.sp, 0);
+    assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+
+    // fake call a function so we set a return address on the stack. We use arbitrary return
+    // address 0x01AA
+    interpreter.memory[interpreter.sp] = 0x01;
+    interpreter.sp = interpreter.sp + 1;
+
+    interpreter.memory[interpreter.sp] = 0xAA;
+    interpreter.sp = interpreter.sp + 1;
+
+    interpreter.execute(Op::Return);
+
+    assert_eq!(interpreter.sp as u16, two_u8s_to_u16(0x01, 0xAA));
+}
+
+#[test]
+fn two_u8s_to_16_test() {
+    let n1 = 0x0;
+    let n2 = 0xF;
+
+    let expected: u16 = 0x0F;
+    assert_eq!(expected, two_u8s_to_u16(n1, n2));
+}
+
+#[test]
+fn three_u8s_to_16_test() {
+    let n1 = 0x0;
+    let n2 = 0xF;
+    let n3 = 0xA;
+
+    let expected: u16 = 0x0FA;
+    assert_eq!(expected, three_u8s_to_u16(n1, n2, n3));
+}
