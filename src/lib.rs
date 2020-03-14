@@ -128,64 +128,64 @@ impl Interpreter {
                 // jump to the subroutine
                 self.pc = three_nibbles_to_usize(msb, b, lsb);
             },
-            Op::CondVxEq(msb, b, lsb) => {
-                let reg = self.v[msb as usize];
-                let byte = two_nibbles_to_u16(b, lsb) as u8;
+            Op::CondVxEq(x, msb, lsb) => {
+                let reg = self.v[x as usize];
+                let byte = two_nibbles_to_u16(msb, lsb) as u8;
 
                 if reg == byte {
                     self.pc = self.pc + 2;
                 }
             },
-            Op::CondVxNe(msb, b, lsb) => {
-                let reg = self.v[msb as usize];
-                let byte = two_nibbles_to_u16(b, lsb) as u8;
+            Op::CondVxNe(x, msb, lsb) => {
+                let reg = self.v[x as usize];
+                let byte = two_nibbles_to_u16(msb, lsb) as u8;
 
                 if reg != byte {
                     self.pc = self.pc + 2;
                 }
             },
-            Op::CondVxVyEq(msb, lsb) => {
-                let reg_msb = self.v[msb as usize];
-                let reg_lsb = self.v[lsb as usize];
+            Op::CondVxVyEq(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
 
-                if reg_msb == reg_lsb {
+                if x_reg == y_reg {
                     self.pc = self.pc + 2;
                 }
             },
-            Op::ConstSetVx(msb, b, lsb) => {
-                let byte = two_nibbles_to_u16(b, lsb) as u8;
-                self.v[msb as usize] = byte;
+            Op::ConstSetVx(x, msb, lsb) => {
+                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                self.v[x as usize] = byte;
             },
-            Op::ConstAddVx(msb, b, lsb) => {
-                let byte = two_nibbles_to_u16(b, lsb) as u8;
-                self.v[msb as usize] = self.v[msb as usize] + byte;
+            Op::ConstAddVx(x, msb, lsb) => {
+                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                self.v[x as usize] = self.v[x as usize] + byte;
             },
-            Op::AssignVyToVx(msb, lsb) => {
-                let reg_lsb = self.v[lsb as usize];
-                self.v[msb as usize] = reg_lsb;
+            Op::AssignVyToVx(x, y) => {
+                let y_reg = self.v[y as usize];
+                self.v[x as usize] = y_reg;
             },
-            Op::BitOpOr(msb, lsb) => {
-                let reg_msb = self.v[msb as usize];
-                let reg_lsb = self.v[lsb as usize];
-                self.v[msb as usize] = reg_msb | reg_lsb;
+            Op::BitOpOr(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
+                self.v[x as usize] = x_reg | y_reg;
             },
-            Op::BitOpAnd(msb, lsb) => {
-                let reg_msb = self.v[msb as usize];
-                let reg_lsb = self.v[lsb as usize];
-                self.v[msb as usize] = reg_msb & reg_lsb;
+            Op::BitOpAnd(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
+                self.v[x as usize] = x_reg & y_reg;
             },
-            Op::BitOpXor(msb, lsb) => {
-                let reg_msb = self.v[msb as usize];
-                let reg_lsb = self.v[lsb as usize];
-                self.v[msb as usize] = reg_msb ^ reg_lsb;
+            Op::BitOpXor(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
+                self.v[x as usize] = x_reg ^ y_reg;
             },
-            Op::MathVxAddVy(msb, lsb) => {
-                let msb_reg = self.v[msb as usize];
-                let lsb_reg = self.v[lsb as usize];
+            Op::MathVxAddVy(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
 
                 // check for carry
-                let (sum, did_overflow) = msb_reg.overflowing_add(lsb_reg);
-                self.v[msb as usize] = sum;
+                let (sum, did_overflow) = x_reg.overflowing_add(y_reg);
+                self.v[x as usize] = sum;
 
                 if did_overflow  {
                     self.v[0xf] = 1
@@ -193,13 +193,13 @@ impl Interpreter {
                     self.v[0xf] = 0;
                 }
             },
-            Op::MathVxMinusVy(msb, lsb) => {
-                let msb_reg = self.v[msb as usize];
-                let lsb_reg = self.v[lsb as usize];
+            Op::MathVxMinusVy(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
 
                 // check for borrow
-                let (val, did_overflow) = msb_reg.overflowing_sub(lsb_reg);
-                self.v[msb as usize] = val;
+                let (val, did_overflow) = x_reg.overflowing_sub(y_reg);
+                self.v[x as usize] = val;
 
                 if (did_overflow) {
                     self.v[0xf] = 0;
@@ -207,33 +207,32 @@ impl Interpreter {
                     self.v[0xf] = 1;
                 }
             },
-            Op::BitOpRtShift(reg_idx) => {
-                let reg_usize = reg_idx as usize;
-                let reg_val = self.v[reg_usize];
+            Op::BitOpRtShift(x) => {
+                let x_reg = self.v[x as usize];
 
-                self.v[0xf] = reg_val & 0b1; // set VF to the value of the lsb
-                self.v[reg_usize] = self.v[reg_usize] >> 1;
+                self.v[0xf] = x_reg & 0b1; // set VF to the value of the lsb
+                self.v[x as usize] = self.v[x as usize] >> 1;
             },
-            Op::BitOpLftShift(reg_idx) => {
-                let reg_usize = reg_idx as usize;
-                let reg_val = self.v[reg_usize];
+            Op::MathVyMinusVx(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
 
-                self.v[0xf] = (reg_val & 0b10000000) >> 7; // set VF to the value of the msb
-                self.v[reg_usize] = self.v[reg_usize] << 1;
-            },
-            Op::MathVyMinusVx(msb, lsb) => {
-                let msb_reg = self.v[msb as usize];
-                let lsb_reg = self.v[lsb as usize];
-
-                let (val, did_overflow) = lsb_reg.overflowing_sub(msb_reg);
-                self.v[msb as usize] = val;
+                let (val, did_overflow) = y_reg.overflowing_sub(x_reg);
+                self.v[x as usize] = val;
 
                 if did_overflow {
                     self.v[0xf] = 0;
                 } else {
                     self.v[0xf] = 1;
                 }
-            }
+            },
+            Op::BitOpLftShift(x) => {
+                let x_reg = self.v[x as usize];
+
+                self.v[0xf] = (x_reg & 0b10000000) >> 7; // set VF to the value of the msb
+                self.v[x as usize] = self.v[x as usize] << 1;
+            },
+
             _ => unimplemented!()
         }
 
@@ -445,11 +444,10 @@ mod interpreter_tests {
 
             let instr = 0x3AAB;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.pc = STARTING_MEMORY_BYTE;
 
-            assert_eq!(interpreter.v[msb_usize], 0);
+            assert_eq!(interpreter.v[x as usize], 0);
 
             interpreter.execute(op);
 
@@ -464,11 +462,10 @@ mod interpreter_tests {
 
             let instr = 0x3A00;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.pc = STARTING_MEMORY_BYTE;
 
-            assert_eq!(interpreter.v[msb_usize], 0);
+            assert_eq!(interpreter.v[x as usize], 0);
 
             interpreter.execute(op);
 
@@ -484,11 +481,10 @@ mod interpreter_tests {
 
             let instr = 0x4A00;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.pc = STARTING_MEMORY_BYTE;
 
-            assert_eq!(interpreter.v[msb_usize], 0);
+            assert_eq!(interpreter.v[x as usize], 0);
 
             interpreter.execute(op);
 
@@ -503,11 +499,10 @@ mod interpreter_tests {
 
             let instr = 0x4AFB;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.pc = STARTING_MEMORY_BYTE;
 
-            assert_eq!(interpreter.v[msb_usize], 0);
+            assert_eq!(interpreter.v[x as usize], 0);
 
             interpreter.execute(op);
 
@@ -522,14 +517,14 @@ mod interpreter_tests {
 
             let nibbles = 0x5AF0; // arbitrary 3 nibbles
             let op = Op::from(nibbles as u16);
-            let (msb, b, _) = usize_to_three_nibbles(nibbles);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(nibbles);
+            let x_usize = x as usize;
+            let y_usize = y as usize;
             interpreter.pc = STARTING_MEMORY_BYTE;
             let arb_byte = 0xAB;
 
-            interpreter.v[msb_usize] = arb_byte;
-            interpreter.v[b_usize] = 0;
+            interpreter.v[x_usize] = arb_byte;
+            interpreter.v[y_usize] = 0;
 
             interpreter.execute(op);
 
@@ -544,14 +539,12 @@ mod interpreter_tests {
 
             let nibbles = 0x5AF0; // arbitrary 3 nibbles
             let op = Op::from(nibbles as u16);
-            let (msb, b, _) = usize_to_three_nibbles(nibbles);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(nibbles);
             interpreter.pc = STARTING_MEMORY_BYTE;
             let arb_byte = 0xAB;
 
-            interpreter.v[msb_usize] = arb_byte;
-            interpreter.v[b_usize] = arb_byte;
+            interpreter.v[x as usize] = arb_byte;
+            interpreter.v[y as usize] = arb_byte;
 
             interpreter.execute(op);
 
@@ -564,15 +557,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x6AFB;
             let op = Op::from(instr as u16);
-            let (msb, b, lsb) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, msb, lsb) = usize_to_three_nibbles(instr);
+            let x_usize = x as usize;
 
-            assert_eq!(interpreter.v[msb_usize], 0);
+            assert_eq!(interpreter.v[x_usize], 0);
 
             interpreter.execute(op);
 
-            let eight_bits = two_nibbles_to_u16(b, lsb);
-            assert_eq!(interpreter.v[msb_usize], eight_bits as u8);
+            let eight_bits = two_nibbles_to_u16(msb, lsb) as u8;
+            assert_eq!(interpreter.v[x_usize], eight_bits);
         }
 
         #[test]
@@ -581,17 +574,17 @@ mod interpreter_tests {
 
             let instr: usize = 0x7AFB;
             let op = Op::from(instr as u16);
-            let (msb, b, lsb) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, msb, lsb) = usize_to_three_nibbles(instr);
+            let x_usize = x as usize;
 
             let offset = 1; // set vA to something other than 0 so we can make sure 0xFB gets added
-            interpreter.v[msb_usize] = offset;
-            assert_eq!(interpreter.v[msb_usize], offset);
+            interpreter.v[x_usize] = offset;
+            assert_eq!(interpreter.v[x_usize], offset);
 
             interpreter.execute(op);
 
-            let eight_bits = two_nibbles_to_u16(b, lsb) as u8;
-            assert_eq!(interpreter.v[msb_usize], (eight_bits + offset) as u8);
+            let eight_bits = two_nibbles_to_u16(msb, lsb) as u8;
+            assert_eq!(interpreter.v[x_usize], eight_bits + offset);
         }
 
         #[test]
@@ -600,17 +593,17 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB0;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
+            let x_usize = x as usize;
+            let y_usize = y as usize;
 
-            interpreter.v[msb_usize] = 42;
-            interpreter.v[b_usize] = 24;
+            interpreter.v[x_usize] = 42;
+            interpreter.v[y_usize] = 24;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 24);
-            assert_eq!(interpreter.v[msb_usize], interpreter.v[b_usize])
+            assert_eq!(interpreter.v[x_usize], 24);
+            assert_eq!(interpreter.v[x_usize], interpreter.v[y_usize])
         }
 
         #[test]
@@ -619,17 +612,17 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB1;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
+            let x_usize = x as usize;
+            let y_usize = y as usize;
 
-            interpreter.v[msb_usize] = 0b11001100;
-            interpreter.v[b_usize] = 0b00110011;
+            interpreter.v[x_usize] = 0b11001100;
+            interpreter.v[y_usize] = 0b00110011;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 0b11111111);
-            assert_eq!(interpreter.v[b_usize], 0b00110011)
+            assert_eq!(interpreter.v[x_usize], 0b11111111);
+            assert_eq!(interpreter.v[y_usize], 0b00110011)
         }
 
         #[test]
@@ -638,17 +631,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB2;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 0b11001100;
-            interpreter.v[b_usize] = 0b00110011;
+            interpreter.v[x as usize] = 0b11001100;
+            interpreter.v[y as usize] = 0b00110011;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 0b00000000);
-            assert_eq!(interpreter.v[b_usize], 0b00110011)
+            assert_eq!(interpreter.v[x as usize], 0b00000000);
+            assert_eq!(interpreter.v[y as usize], 0b00110011)
         }
 
         #[test]
@@ -657,17 +648,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB3;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 0b11001101;
-            interpreter.v[b_usize] = 0b00110011;
+            interpreter.v[x as usize] = 0b11001101;
+            interpreter.v[y as usize] = 0b00110011;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 0b11111110);
-            assert_eq!(interpreter.v[b_usize], 0b00110011)
+            assert_eq!(interpreter.v[x as usize], 0b11111110);
+            assert_eq!(interpreter.v[y as usize], 0b00110011)
         }
 
         #[test]
@@ -676,17 +665,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB4;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 3;
-            interpreter.v[b_usize] = 4;
+            interpreter.v[x as usize] = 3;
+            interpreter.v[y as usize] = 4;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 3 + 4);
-            assert_eq!(interpreter.v[b_usize], 4);
+            assert_eq!(interpreter.v[x as usize], 3 + 4);
+            assert_eq!(interpreter.v[y as usize], 4);
             assert_eq!(interpreter.v[0xf], 0);
         }
 
@@ -696,17 +683,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB4;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 255;
-            interpreter.v[b_usize] = 3;
+            interpreter.v[x as usize] = 255;
+            interpreter.v[y as usize] = 3;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 2);
-            assert_eq!(interpreter.v[b_usize], 3);
+            assert_eq!(interpreter.v[x as usize], 2);
+            assert_eq!(interpreter.v[y as usize], 3);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -716,17 +701,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB5;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 4;
-            interpreter.v[b_usize] = 3;
+            interpreter.v[x as usize] = 4;
+            interpreter.v[y as usize] = 3;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 1);
-            assert_eq!(interpreter.v[b_usize],3);
+            assert_eq!(interpreter.v[x as usize], 1);
+            assert_eq!(interpreter.v[y as usize],3);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -736,17 +719,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB5;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 1;
-            interpreter.v[b_usize] = 2;
+            interpreter.v[x as usize] = 1;
+            interpreter.v[y as usize] = 2;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 255);
-            assert_eq!(interpreter.v[b_usize], 2);
+            assert_eq!(interpreter.v[x as usize], 255);
+            assert_eq!(interpreter.v[y as usize], 2);
             assert_eq!(interpreter.v[0xf], 0);
         }
 
@@ -756,20 +737,19 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB6;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 0b10000010;
+            interpreter.v[x as usize] = 0b10000010;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 0b01000001);
+            assert_eq!(interpreter.v[x as usize], 0b01000001);
             assert_eq!(interpreter.v[0xf], 0);
 
             let op2 = Op::from(instr as u16);
             interpreter.execute(op2);
 
-            assert_eq!(interpreter.v[msb_usize], 0b00100000);
+            assert_eq!(interpreter.v[x as usize], 0b00100000);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -779,20 +759,19 @@ mod interpreter_tests {
 
             let instr: usize = 0x8ABE;
             let op = Op::from(instr as u16);
-            let (msb, _, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
+            let (x, _, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 0b10000010;
+            interpreter.v[x as usize] = 0b10000010;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 0b00000100);
+            assert_eq!(interpreter.v[x as usize], 0b00000100);
             assert_eq!(interpreter.v[0xf], 1);
 
             let op2 = Op::from(instr as u16);
             interpreter.execute(op2);
 
-            assert_eq!(interpreter.v[msb_usize], 0b00001000);
+            assert_eq!(interpreter.v[x as usize], 0b00001000);
             assert_eq!(interpreter.v[0xf], 0);
         }
 
@@ -802,17 +781,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB7;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 3;
-            interpreter.v[b_usize] = 4;
+            interpreter.v[x as usize] = 3;
+            interpreter.v[y as usize] = 4;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 1);
-            assert_eq!(interpreter.v[b_usize],4);
+            assert_eq!(interpreter.v[x as usize], 1);
+            assert_eq!(interpreter.v[y as usize],4);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -822,17 +799,15 @@ mod interpreter_tests {
 
             let instr: usize = 0x8AB7;
             let op = Op::from(instr as u16);
-            let (msb, b, _) = usize_to_three_nibbles(instr);
-            let msb_usize = msb as usize;
-            let b_usize = b as usize;
+            let (x, y, _) = usize_to_three_nibbles(instr);
 
-            interpreter.v[msb_usize] = 2;
-            interpreter.v[b_usize] = 1;
+            interpreter.v[x as usize] = 2;
+            interpreter.v[y as usize] = 1;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[msb_usize], 255);
-            assert_eq!(interpreter.v[b_usize], 1);
+            assert_eq!(interpreter.v[x as usize], 255);
+            assert_eq!(interpreter.v[y as usize], 1);
             assert_eq!(interpreter.v[0xf], 0);
         }
     }
