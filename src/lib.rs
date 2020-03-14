@@ -53,7 +53,7 @@ pub struct Interpreter {
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
     v: [u8; 16],
 
-    graphics: [u8; 64 * 32], // 64x32 pixel monochrome screen
+    graphics: [bool; 64 * 32], // 64x32 pixel monochrome screen
 
     delay_timer: u8,         // 60 Hz timer that can be set and read
     sound_timer: u8,         // 60 Hz timer that beeps whenever it is nonzero
@@ -71,7 +71,7 @@ impl Interpreter {
             addr: 0,
             pc: 0,
             v: [0; 16],
-            graphics: [0; 64 * 32],
+            graphics: [false; 64 * 32],
             delay_timer: 0,
             sound_timer: 0,
             key_input: [0; 16],
@@ -83,21 +83,22 @@ impl Interpreter {
         }
     }
 
+    /// Given x and y coordinate for a bit in the 64x32 graphics array, return the corresponding
+    /// index of that bit in the array
+    fn get_graphics_idx(x: u8, y: u8) -> usize {
+        let column = x as usize;
+        let row = (y * 8) as usize;
+
+        column + row
+    }
+
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
-                let mut set_vf: bool = false;
                 for i in 0..self.graphics.len() {
-                    if 0u8 ^ self.graphics[i] == 1 {
-                        set_vf = true;
-                    }
-                    self.graphics[i] = 0;
-                }
-
-                if set_vf {
-                    self.v[0xf] = 1;
+                    self.graphics[i] = false;
                 }
             },
             Op::Return => {
@@ -260,6 +261,36 @@ impl Interpreter {
                 let new_reg_val = reg_val & eight_bits;
 
                 self.v[x as usize] = new_reg_val;
+            },
+            Op::DispDraw(x, y, height) => {
+                let x_coord = self.v[x as usize];
+                let y_coord = self.v[y as usize];
+
+                let gfx_start_idx = Self::get_graphics_idx(x, y);
+
+                let mut should_set_vf = false;
+                for i in 0 as usize..height as usize {
+                    let byte = self.memory[self.addr as usize + i];
+                    let row = i * 8 as usize;
+                    for j in 0 as usize..8 as usize {
+                        let bit = ((byte >> (7 -j)) & 1) == 1;
+
+                        let gfx_offset = row + j;
+
+                        let is_different = should_set_vf != true &&
+                            self.graphics[gfx_start_idx + gfx_offset] != bit;
+                        if is_different {
+                            should_set_vf = true;
+                        }
+                        self.graphics[gfx_start_idx + gfx_offset] = bit;
+                    }
+                }
+
+                if should_set_vf {
+                    self.v[0xf] = 1;
+                } else {
+                    self.v[0xf] = 0;
+                }
             }
 
             _ => unimplemented!()
@@ -398,16 +429,16 @@ mod interpreter_tests {
 
             let instr = 0x00E0;
             let op = Op::from(instr);
+
+            // set some graphics bits to true so we can later see the set to false;
+            interpreter.graphics[0] = true;
+            interpreter.graphics[interpreter.graphics.len() - 1] = true;
+
             interpreter.execute(op);
 
             for i in 0..interpreter.graphics.len() {
-                assert_eq!(interpreter.graphics[i], 0);
+                assert_eq!(interpreter.graphics[i], false);
             }
-            assert_eq!(interpreter.v[0xf], 0);
-
-            interpreter.graphics[0] = 1;
-            interpreter.execute(Op::DispClear);
-            assert_eq!(interpreter.v[0xf], 1);
         }
 
         #[test]
@@ -959,6 +990,84 @@ mod interpreter_tests {
             }
 
             assert!(num_different > 5);
+        }
+
+        #[test]
+        fn display_op_collision() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xD012;
+            let mut op = Op::from(instr as u16);
+            let (x, y, height) = usize_to_three_nibbles(instr);
+
+            // add arbitrary values starting at the memory address in I (which will be 0)
+            // because these will be the values that get written to the graphics array
+
+            assert_eq!(interpreter.addr, 0);
+            let starting_addr = interpreter.addr as usize;
+
+            let mut sprite = Vec::with_capacity((height * 8) as usize);
+            for i in 0 as usize..height as usize { // 8 bits in a byte
+
+                let random_byte: u8 = thread_rng().gen();
+
+                // store the bits of the sprite
+                for j in 0..8 {
+                    let bit = ((random_byte >> (7 - j)) & 1) == 1;
+                    sprite.push(bit);
+                }
+                interpreter.memory[(starting_addr + i) as usize] = random_byte;
+            }
+
+            for i in 0..interpreter.graphics.len() {
+                assert_eq!(interpreter.graphics[i], false);
+            }
+
+            interpreter.execute(op);
+
+            let gfx_addr = Interpreter::get_graphics_idx(x, y);
+            for i in 0..height as usize * 8 as usize {
+                assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
+            }
+
+            assert_eq!(interpreter.v[0xf], 1);
+        }
+
+        #[test]
+        fn display_op_no_collision() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xD011; // height is 1, so only 8 bits
+            let mut op = Op::from(instr as u16);
+            let (x, y, height) = usize_to_three_nibbles(instr);
+
+            // add arbitrary values starting at the memory address in I (which will be 0)
+            // because these will be the values that get written to the graphics array
+
+            assert_eq!(interpreter.addr, 0);
+            let starting_addr = interpreter.addr as usize;
+
+            let mut sprite = Vec::with_capacity(8);
+            let arb_byte = 0b10101010;
+
+            interpreter.memory[starting_addr] = arb_byte;
+
+            // store the same bits we're setting in the op so we won't set reg VF to 1
+            let gfx_addr = Interpreter::get_graphics_idx(x, y);
+
+            for j in 0..8 {
+                let bit = ((arb_byte >> (7 - j)) & 1) == 1;
+                sprite.push(bit);
+                interpreter.graphics[gfx_addr + j as usize] = bit;
+            }
+
+            interpreter.execute(op);
+
+            for i in 0..height as usize * 8 as usize {
+                assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
+            }
+
+            assert_eq!(interpreter.v[0xf], 0);
         }
     }
 
