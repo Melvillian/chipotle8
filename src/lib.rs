@@ -243,6 +243,12 @@ impl Interpreter {
             Op::MemSetI(msb, b, lsb) => {
                 let addr = three_nibbles_to_u16(msb, b, lsb);
                 self.addr = addr;
+            },
+            Op::GotoPlusV0(msb, b, lsb) => {
+                let addr = three_nibbles_to_u16(msb, b, lsb);
+                let v0 = self.v[0];
+
+                self.pc = addr as usize + v0 as usize;
             }
 
             _ => unimplemented!()
@@ -879,6 +885,24 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.addr, addr);
+        }
+
+        #[test]
+        fn goto_plus_v0_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xB012;
+            let op = Op::from(instr as u16);
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let addr = three_nibbles_to_u16(msb, b, lsb);
+
+            interpreter.v[0] = 42;
+
+            assert_eq!(interpreter.pc, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc as u16, interpreter.v[0] as u16 + addr);
         }
     }
 
