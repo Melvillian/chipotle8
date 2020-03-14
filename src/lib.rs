@@ -46,7 +46,7 @@ pub struct Interpreter {
                         // The stack pointer always points on beyond the top of the stack, i.e. onto
                         // unallocated memory
 
-    instr: u16,         // address instruction register
+    pub addr: u16,     // address instruction register
     pc: usize,          // program counter, 16 bits are needed but we use usize so we can index with it
 
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
@@ -67,7 +67,7 @@ impl Interpreter {
         Interpreter {
             memory: [0; 4096],
             sp: 0,
-            instr: 0,
+            addr: 0,
             pc: 0,
             v: [0; 16],
             graphics: [0; 64 * 32],
@@ -201,7 +201,7 @@ impl Interpreter {
                 let (val, did_overflow) = x_reg.overflowing_sub(y_reg);
                 self.v[x as usize] = val;
 
-                if (did_overflow) {
+                if did_overflow {
                     self.v[0xf] = 0;
                 } else {
                     self.v[0xf] = 1;
@@ -239,6 +239,10 @@ impl Interpreter {
                 if x_reg != y_reg {
                     self.skip_instruction();
                 }
+            },
+            Op::MemSetI(msb, b, lsb) => {
+                let addr = three_nibbles_to_u16(msb, b, lsb);
+                self.addr = addr;
             }
 
             _ => unimplemented!()
@@ -859,6 +863,22 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc, 0);
+        }
+
+        #[test]
+        fn mem_set_i_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xA012;
+            let op = Op::from(instr as u16);
+            let (msb, b, lsb) = usize_to_three_nibbles(instr);
+            let addr = three_nibbles_to_u16(msb, b, lsb);
+
+            assert_eq!(interpreter.addr, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, addr);
         }
     }
 
