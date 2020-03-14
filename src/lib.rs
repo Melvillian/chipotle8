@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use op::Op;
+use rand::{Rng, random, thread_rng};
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -130,7 +131,7 @@ impl Interpreter {
             },
             Op::CondVxEq(x, msb, lsb) => {
                 let reg = self.v[x as usize];
-                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                let byte = two_nibbles_to_u8(msb, lsb);
 
                 if reg == byte {
                     self.skip_instruction();
@@ -138,7 +139,7 @@ impl Interpreter {
             },
             Op::CondVxNe(x, msb, lsb) => {
                 let reg = self.v[x as usize];
-                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                let byte = two_nibbles_to_u8(msb, lsb);
 
                 if reg != byte {
                     self.skip_instruction();
@@ -153,11 +154,11 @@ impl Interpreter {
                 }
             },
             Op::ConstSetVx(x, msb, lsb) => {
-                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                let byte = two_nibbles_to_u8(msb, lsb);
                 self.v[x as usize] = byte;
             },
             Op::ConstAddVx(x, msb, lsb) => {
-                let byte = two_nibbles_to_u16(msb, lsb) as u8;
+                let byte = two_nibbles_to_u8(msb, lsb);
                 self.v[x as usize] = self.v[x as usize] + byte;
             },
             Op::AssignVyToVx(x, y) => {
@@ -249,6 +250,16 @@ impl Interpreter {
                 let v0 = self.v[0];
 
                 self.pc = addr as usize + v0 as usize;
+            },
+            Op::Rand(x, msb, lsb) => {
+                let random_byte: u8 = thread_rng().gen();
+
+                let reg_val = self.v[x as usize];
+                let eight_bits = two_nibbles_to_u8(msb, lsb);
+
+                let new_reg_val = reg_val & eight_bits;
+
+                self.v[x as usize] = new_reg_val;
             }
 
             _ => unimplemented!()
@@ -329,11 +340,16 @@ fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
 /// to convert two 8-bit pieces of data in memory into a single 16-bit
 /// instruction.
 fn two_nibbles_to_u16(msb: u8, lsb: u8) -> u16 {
-    ((msb as u16) << 4) | (lsb as u16)
+    two_nibbles_to_u8(msb, lsb) as u16
+}
+
+fn two_nibbles_to_u8(msb: u8, lsb: u8) -> u8 {
+    assert!(msb <= 0xF && lsb <= 0xF, "msb: {}, lsb: {}", msb, lsb);
+    msb << 4 | lsb
 }
 
 fn two_nibbles_to_usize(msb: u8, lsb: u8) -> usize {
-    two_nibbles_to_u16(msb, lsb) as usize
+    two_nibbles_to_u8(msb, lsb) as usize
 }
 
 fn usize_to_two_nibbles(u: usize) -> (u8, u8) {
@@ -363,10 +379,10 @@ fn usize_to_three_nibbles(u: usize) -> (u8, u8, u8) {
     let b = ((u >> 4) & mask) as u8;
     let lsb = (u & mask) as u8;
 
+    assert!(msb <= 0xF && b <= 0xF && lsb <= 0xF, "msb: {}, b: {}, lsb: {}", msb, b, lsb);
+
     (msb, b, lsb)
 }
-
-
 
 #[cfg(test)]
 mod interpreter_tests {
@@ -588,7 +604,7 @@ mod interpreter_tests {
 
             interpreter.execute(op);
 
-            let eight_bits = two_nibbles_to_u16(msb, lsb) as u8;
+            let eight_bits = two_nibbles_to_u8(msb, lsb);
             assert_eq!(interpreter.v[x_usize], eight_bits);
         }
 
@@ -607,7 +623,7 @@ mod interpreter_tests {
 
             interpreter.execute(op);
 
-            let eight_bits = two_nibbles_to_u16(msb, lsb) as u8;
+            let eight_bits = two_nibbles_to_u8(msb, lsb);
             assert_eq!(interpreter.v[x_usize], eight_bits + offset);
         }
 
@@ -903,6 +919,46 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc as u16, interpreter.v[0] as u16 + addr);
+        }
+
+        #[test]
+        fn random_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xC012;
+            let mut op = Op::from(instr as u16);
+            let (x, msb, lsb) = usize_to_three_nibbles(instr);
+            let eight_bits = two_nibbles_to_u8(msb, lsb);
+
+            let rand_byte = 0xBC;
+            let mut prev_byte = rand_byte;
+
+            // set reg to arbitrary byte so we can check that it changed later
+            interpreter.v[x as usize] = rand_byte;
+
+            // I don't want to bother setting up tests for randomness on this op, so because I'm
+            // lazy I'm going to run the op 10 times and makes sure at least 1 of those times it
+            // changes to reg's value to a different number. This test will produce a false negative
+            // very infrequently, which I can live with.
+
+            let mut num_different = 0;
+            for _ in 0..10 {
+                interpreter.execute(op);
+
+                let reg_val = interpreter.v[x as usize];
+
+                // check to make sure the op worked as expected
+                assert_eq!(reg_val, rand_byte & eight_bits);
+
+                // check to make sure the op is changing (i.e. it's random)
+                if reg_val != rand_byte { // it changed
+                    num_different = num_different + 1;
+                }
+
+                prev_byte = rand_byte;
+            }
+
+            assert!(num_different > 5);
         }
     }
 
