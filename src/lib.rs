@@ -133,7 +133,7 @@ impl Interpreter {
                 let byte = two_nibbles_to_u16(msb, lsb) as u8;
 
                 if reg == byte {
-                    self.pc = self.pc + 2;
+                    self.skip_instruction();
                 }
             },
             Op::CondVxNe(x, msb, lsb) => {
@@ -141,7 +141,7 @@ impl Interpreter {
                 let byte = two_nibbles_to_u16(msb, lsb) as u8;
 
                 if reg != byte {
-                    self.pc = self.pc + 2;
+                    self.skip_instruction();
                 }
             },
             Op::CondVxVyEq(x, y) => {
@@ -149,7 +149,7 @@ impl Interpreter {
                 let y_reg = self.v[y as usize];
 
                 if x_reg == y_reg {
-                    self.pc = self.pc + 2;
+                    self.skip_instruction();
                 }
             },
             Op::ConstSetVx(x, msb, lsb) => {
@@ -232,10 +232,24 @@ impl Interpreter {
                 self.v[0xf] = (x_reg & 0b10000000) >> 7; // set VF to the value of the msb
                 self.v[x as usize] = self.v[x as usize] << 1;
             },
+            Op::CondVxVyNe(x, y) => {
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
+
+                if x_reg != y_reg {
+                    self.skip_instruction();
+                }
+            }
 
             _ => unimplemented!()
         }
 
+    }
+
+    /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
+    /// by some conditional opcodes
+    fn skip_instruction(&mut self) {
+        self.pc = self.pc + 2;
     }
 
     /// Draw the 64x32 pixel map
@@ -809,6 +823,42 @@ mod interpreter_tests {
             assert_eq!(interpreter.v[x as usize], 255);
             assert_eq!(interpreter.v[y as usize], 1);
             assert_eq!(interpreter.v[0xf], 0);
+        }
+
+        #[test]
+        fn cond_vx_ne_vy_op_not_equal() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x9AB0;
+            let op = Op::from(instr as u16);
+            let (x, y, _) = usize_to_three_nibbles(instr);
+
+            interpreter.v[x as usize] = 2;
+            interpreter.v[y as usize] = 1;
+
+            assert_eq!(interpreter.pc, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc, 2);
+        }
+
+        #[test]
+        fn cond_vx_ne_vy_op_equal() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0x9AB0;
+            let op = Op::from(instr as u16);
+            let (x, y, _) = usize_to_three_nibbles(instr);
+
+            interpreter.v[x as usize] = 2;
+            interpreter.v[y as usize] = 2;
+
+            assert_eq!(interpreter.pc, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc, 0);
         }
     }
 
