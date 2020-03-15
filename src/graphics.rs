@@ -2,6 +2,7 @@
 
 use fixedbitset::FixedBitSet;
 use std::ops::Index;
+use minifb::Key;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
@@ -56,7 +57,52 @@ impl Graphics {
         self.buffer.set(bit, enabled)
     }
 
-    //pub fn key_pressed
+    /// We use the following mapping for the 16 bit hex keyboard
+    /// Keypad                   Keyboard
+    /// +-+-+-+-+                +-+-+-+-+
+    /// |1|2|3|C|                |1|2|3|4|
+    /// +-+-+-+-+                +-+-+-+-+
+    /// |4|5|6|D|                |Q|W|E|R|
+    /// +-+-+-+-+       =>       +-+-+-+-+
+    /// |7|8|9|E|                |A|S|D|F|
+    /// +-+-+-+-+                +-+-+-+-+
+    /// |A|0|B|F|                |Z|X|C|V|
+    /// +-+-+-+-+                +-+-+-+-+
+    fn map_key(k: Key) -> Option<usize> {
+        match k {
+            Key::Key1 => Some(1),
+            Key::Key2 => Some(2),
+            Key::Key3 => Some(3),
+            Key::Key4 => Some(0xC),
+            Key::Q    => Some(4),
+            Key::W    => Some(5),
+            Key::E    => Some(6),
+            Key::R    => Some(0xD),
+            Key::A    => Some(7),
+            Key::S    => Some(8),
+            Key::D    => Some(9),
+            Key::F    => Some(0xE),
+            Key::Z    => Some(0xA),
+            Key::X    => Some(0),
+            Key::C    => Some(0xB),
+            Key::V    => Some(0xF),
+            _ => None,
+        }
+    }
+
+    /// Handle the key down event for one of the 16 possible keys
+    pub fn handle_key_down(&mut self, k: Key) {
+        if let Some(idx) = Graphics::map_key(k) {
+            self.key_input.put(idx);
+        }
+    }
+
+    /// Handle the key up event for one of the 16 possible keys
+    pub fn handle_key_up(&mut self, k: Key) {
+        if let Some(idx) = Graphics::map_key(k) {
+            self.key_input.set(idx, false);
+        }
+    }
 }
 
 impl Index<usize> for Graphics {
