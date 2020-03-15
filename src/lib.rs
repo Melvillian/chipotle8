@@ -60,10 +60,6 @@ pub struct Interpreter {
 
     delay_timer: u8,         // 60 Hz timer that can be set and read
     sound_timer: u8,         // 60 Hz timer that beeps whenever it is nonzero
-
-    key_input: [u8; 16],     // 16 byte hex keyboard input (0-F).
-                             // Each byte stores the 1 (on) or 0 (off) keypress state
-    font_set: [[u8; 5]; 2],  // stores the 16 5-byte hex font set
 }
 
 impl Interpreter {
@@ -77,12 +73,6 @@ impl Interpreter {
             graphics: Graphics::new(),
             delay_timer: 0,
             sound_timer: 0,
-            key_input: [0; 16],
-            font_set: [
-                [0xF0, 0x90, 0x90, 0x90, 0xF0],  // 0
-                [0x20, 0x60, 0x20, 0x20, 0x70],  // 1
-            // TODO..
-            ]
         }
     }
 
