@@ -292,6 +292,9 @@ impl Interpreter {
                     self.pc = self.pc + 2;
                 }
             },
+            Op::DelayGet(x) => {
+                self.v[x as usize] = self.delay_timer;
+            },
 
             _ => unimplemented!()
         }
@@ -1145,6 +1148,25 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
             assert_eq!(interpreter.pc, 0);
+        }
+
+        #[test]
+        fn delay_timer_set_vx_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xF007;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            assert_eq!(interpreter.v[x as usize], 0);
+            assert_eq!(interpreter.delay_timer, 0);
+
+            // artificially set delay_timer reg
+            interpreter.delay_timer = 42;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[x as usize], 42);
         }
     }
 
