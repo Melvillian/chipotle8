@@ -4,7 +4,8 @@ use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use op::Op;
-use rand::{Rng, random, thread_rng};
+use rand::{Rng, thread_rng};
+use crate::graphics::Graphics;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -14,6 +15,8 @@ const GAME_FILE_MEMORY_SIZE: usize = MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_
 const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
 
 mod op;
+mod graphics;
+
 
 // # Interpreter
 // * 4096 (0x1000) bytes of memory
@@ -53,7 +56,7 @@ pub struct Interpreter {
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
     v: [u8; 16],
 
-    graphics: [bool; 64 * 32], // 64x32 pixel monochrome screen
+    graphics: Graphics,      // 64x32 pixel monochrome screen
 
     delay_timer: u8,         // 60 Hz timer that can be set and read
     sound_timer: u8,         // 60 Hz timer that beeps whenever it is nonzero
@@ -71,7 +74,7 @@ impl Interpreter {
             addr: 0,
             pc: 0,
             v: [0; 16],
-            graphics: [false; 64 * 32],
+            graphics: Graphics::new(),
             delay_timer: 0,
             sound_timer: 0,
             key_input: [0; 16],
@@ -83,22 +86,13 @@ impl Interpreter {
         }
     }
 
-    /// Given x and y coordinate for a bit in the 64x32 graphics array, return the corresponding
-    /// index of that bit in the array
-    fn get_graphics_idx(x: u8, y: u8) -> usize {
-        let column = x as usize;
-        let row = (y * 8) as usize;
-
-        column + row
-    }
-
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
                 for i in 0..self.graphics.len() {
-                    self.graphics[i] = false;
+                    self.graphics.set(i, false);
                 }
             },
             Op::Return => {
@@ -266,7 +260,7 @@ impl Interpreter {
                 let x_coord = self.v[x as usize];
                 let y_coord = self.v[y as usize];
 
-                let gfx_start_idx = Self::get_graphics_idx(x, y);
+                let gfx_start_idx = Graphics::get_graphics_idx(x, y);
 
                 let mut should_set_vf = false;
                 for i in 0 as usize..height as usize {
@@ -282,7 +276,7 @@ impl Interpreter {
                         if is_different {
                             should_set_vf = true;
                         }
-                        self.graphics[gfx_start_idx + gfx_offset] = bit;
+                        self.graphics.set(gfx_start_idx + gfx_offset, bit);
                     }
                 }
 
@@ -431,8 +425,8 @@ mod interpreter_tests {
             let op = Op::from(instr);
 
             // set some graphics bits to true so we can later see the set to false;
-            interpreter.graphics[0] = true;
-            interpreter.graphics[interpreter.graphics.len() - 1] = true;
+            interpreter.graphics.set(0, true);
+            interpreter.graphics.set(interpreter.graphics.len() - 1, true);
 
             interpreter.execute(op);
 
@@ -1025,7 +1019,7 @@ mod interpreter_tests {
 
             interpreter.execute(op);
 
-            let gfx_addr = Interpreter::get_graphics_idx(x, y);
+            let gfx_addr = Graphics::get_graphics_idx(x, y);
             for i in 0..height as usize * 8 as usize {
                 assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
             }
@@ -1053,12 +1047,12 @@ mod interpreter_tests {
             interpreter.memory[starting_addr] = arb_byte;
 
             // store the same bits we're setting in the op so we won't set reg VF to 1
-            let gfx_addr = Interpreter::get_graphics_idx(x, y);
+            let gfx_addr = Graphics::get_graphics_idx(x, y);
 
             for j in 0..8 {
                 let bit = ((arb_byte >> (7 - j)) & 1) == 1;
                 sprite.push(bit);
-                interpreter.graphics[gfx_addr + j as usize] = bit;
+                interpreter.graphics.set(gfx_addr +j as usize, bit);
             }
 
             interpreter.execute(op);
