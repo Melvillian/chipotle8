@@ -275,7 +275,23 @@ impl Interpreter {
                 } else {
                     self.v[0xf] = 0;
                 }
-            }
+            },
+            Op::KeyOpEqVx(x) => {
+                let x_reg = self.v[x as usize];
+                let key_state = self.graphics.get_key_state(x_reg as usize);
+
+                if key_state {
+                    self.pc = self.pc + 2;
+                }
+            },
+            Op::KeyOpNeVx(x) => {
+                let x_reg = self.v[x as usize];
+                let key_state = self.graphics.get_key_state(x_reg as usize);
+
+                if !key_state {
+                    self.pc = self.pc + 2;
+                }
+            },
 
             _ => unimplemented!()
         }
@@ -405,6 +421,7 @@ mod interpreter_tests {
 
     mod execute {
         use super::*;
+        use minifb::Key;
 
         #[test]
         fn display_clear_op() {
@@ -1052,6 +1069,82 @@ mod interpreter_tests {
             }
 
             assert_eq!(interpreter.v[0xf], 0);
+        }
+
+        #[test]
+        fn key_eq_vx_op_keyup() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xE09E;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+            let x_reg = interpreter.v[x as usize] as usize;
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.pc, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc, 0);
+        }
+
+        #[test]
+        fn key_eq_vx_op_keydown() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xE09E;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+            interpreter.v[x as usize] = 1; // setup x register for keypress
+            let x_reg = interpreter.v[x as usize] as usize;
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.pc, 0);
+
+            // fake pressing down the key in reg
+            interpreter.graphics.handle_key_down(Key::Key1);
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
+            assert_eq!(interpreter.pc, 2);
+        }
+
+        #[test]
+        fn key_ne_vx_op_keyup() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xE0A1;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+            let x_reg = interpreter.v[x as usize] as usize;
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.pc, 0);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.pc, 2);
+        }
+
+        #[test]
+        fn key_ne_vx_op_keydown() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xE0A1;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+            interpreter.v[x as usize] = 1; // setup x register for keypress
+            let x_reg = interpreter.v[x as usize] as usize;
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.pc, 0);
+
+            // fake pressing down the key in reg
+            interpreter.graphics.handle_key_down(Key::Key1);
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
+            assert_eq!(interpreter.pc, 0);
         }
     }
 

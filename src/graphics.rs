@@ -103,6 +103,10 @@ impl Graphics {
             self.key_input.set(idx, false);
         }
     }
+
+    pub fn get_key_state(&self, bit: usize) -> bool {
+        self.key_input[bit]
+    }
 }
 
 impl Index<usize> for Graphics {
