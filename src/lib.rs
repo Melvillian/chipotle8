@@ -366,6 +366,21 @@ impl Interpreter {
 
                 self.addr = font_idx as u16;
             }
+            Op::Bcd(x) => {
+                let reg = self.v[x as usize];
+                let ascii_offset = 48;
+
+                let decimal_repr = format!("{:03}", reg);
+                println!("{}", decimal_repr);
+                let addr_usize = self.addr as usize;
+                self.memory[addr_usize + 0 as usize] = decimal_repr.get(0..1)
+                    .unwrap().as_bytes()[0] - ascii_offset;
+                self.memory[addr_usize + 1 as usize] = decimal_repr.get(1..2)
+                    .unwrap().as_bytes()[0] - ascii_offset;
+                self.memory[addr_usize + 2 as usize] = decimal_repr.get(2..3)
+                    .unwrap().as_bytes()[0] - ascii_offset;
+
+            }
 
             _ => unimplemented!(),
         }
@@ -1416,6 +1431,25 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.addr, (15 * NUM_BYTES_IN_FONT_CHAR) as u16);
+        }
+
+        #[test]
+        fn bcd_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xF133;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            assert_eq!(interpreter.addr, 0);
+
+            interpreter.v[x as usize] = 123;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.memory[(interpreter.addr + 0) as usize], 1);
+            assert_eq!(interpreter.memory[(interpreter.addr + 1) as usize], 2);
+            assert_eq!(interpreter.memory[(interpreter.addr + 2) as usize], 3);
         }
     }
 
