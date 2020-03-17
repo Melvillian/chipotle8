@@ -78,7 +78,7 @@ impl From<u16> for Op {
         let mask = 0xF;
 
         // these are the 4 nibbles of item, where nibb_1 is the MSB and nibb_4 is the LSB
-        let nibb_1 = ((item >> 12) & mask) as u8 ;
+        let nibb_1 = ((item >> 12) & mask) as u8;
         let nibb_2 = ((item >> 8) & mask) as u8;
         let nibb_3 = ((item >> 4) & mask) as u8;
         let nibb_4 = (item & mask) as u8;
@@ -87,61 +87,52 @@ impl From<u16> for Op {
         let panic_msg = format!("unknown u16 {}", item);
 
         match nibbles {
-            [0x0, n2, n3, n4] => {
-                match n4 {
-                    0x0       => Op::DispClear,
-                    0xE       => Op::Return,
-                    _ => Op::CallRca(n2, n3, n4),
-                }
+            [0x0, n2, n3, n4] => match n4 {
+                0x0 => Op::DispClear,
+                0xE => Op::Return,
+                _ => Op::CallRca(n2, n3, n4),
             },
             [0x1, n2, n3, n4] => Op::Goto(n2, n3, n4),
             [0x2, n2, n3, n4] => Op::GotoSubRtn(n2, n3, n4),
             [0x3, n2, n3, n4] => Op::CondVxEq(n2, n3, n4),
             [0x4, n2, n3, n4] => Op::CondVxNe(n2, n3, n4),
-            [0x5, n2, n3, _]  => Op::CondVxVyEq(n2, n3),
+            [0x5, n2, n3, _] => Op::CondVxVyEq(n2, n3),
             [0x6, n2, n3, n4] => Op::ConstSetVx(n2, n3, n4),
             [0x7, n2, n3, n4] => Op::ConstAddVx(n2, n3, n4),
-            [0x8, n2, n3, n4] => {
-                match n4 {
-                    0x0       => Op::AssignVyToVx(n2, n3),
-                    0x1       => Op::BitOpOr(n2, n3),
-                    0x2       => Op::BitOpAnd(n2, n3),
-                    0x3       => Op::BitOpXor(n2, n3),
-                    0x4       => Op::MathVxAddVy(n2, n3),
-                    0x5       => Op::MathVxMinusVy(n2, n3),
-                    0x6       => Op::BitOpRtShift(n2),
-                    0x7       => Op::MathVyMinusVx(n2, n3),
-                    0xE       => Op::BitOpLftShift(n2),
-                    _ => panic!(panic_msg),
-                }
+            [0x8, n2, n3, n4] => match n4 {
+                0x0 => Op::AssignVyToVx(n2, n3),
+                0x1 => Op::BitOpOr(n2, n3),
+                0x2 => Op::BitOpAnd(n2, n3),
+                0x3 => Op::BitOpXor(n2, n3),
+                0x4 => Op::MathVxAddVy(n2, n3),
+                0x5 => Op::MathVxMinusVy(n2, n3),
+                0x6 => Op::BitOpRtShift(n2),
+                0x7 => Op::MathVyMinusVx(n2, n3),
+                0xE => Op::BitOpLftShift(n2),
+                _ => panic!(panic_msg),
             },
-            [0x9, n2, n3, 0]  => Op::CondVxVyNe(n2, n3),
+            [0x9, n2, n3, 0] => Op::CondVxVyNe(n2, n3),
             [0xA, n2, n3, n4] => Op::MemSetI(n2, n3, n4),
             [0xB, n2, n3, n4] => Op::GotoPlusV0(n2, n3, n4),
             [0xC, n2, n3, n4] => Op::Rand(n2, n3, n4),
             [0xD, n2, n3, n4] => Op::DispDraw(n2, n3, n4),
-            [0xE, n2, n3, n4] => {
-                match [n3, n4] {
-                    [0x9, 0xE] => Op::KeyOpEqVx(n2),
-                    [0xA, 0x1] => Op::KeyOpNeVx(n2),
-                    _ => panic!(panic_msg),
-                }
+            [0xE, n2, n3, n4] => match [n3, n4] {
+                [0x9, 0xE] => Op::KeyOpEqVx(n2),
+                [0xA, 0x1] => Op::KeyOpNeVx(n2),
+                _ => panic!(panic_msg),
             },
-            [0xF, n2, n3, n4] => {
-                match [n3, n4] {
-                    [0x0, 0x7] => Op::DelayGet(n2),
-                    [0x0, 0xA] => Op::KeyOpGet(n2),
-                    [0x1, 0x5] => Op::DelaySet(n2),
-                    [0x1, 0x8] => Op::SoundSet(n2),
-                    [0x1, 0xE] => Op::MemIPlusEqVx(n2),
-                    [0x2, 0x9] => Op::MemISetSprite(n2),
-                    [0x3, 0x3] => Op::Bcd(n2),
-                    [0x5, 0x5] => Op::RegDump(n2),
-                    [0x6, 0x5] => Op::RegLoad(n2),
-                    _ => panic!(panic_msg),
-
-                }
-            }
+            [0xF, n2, n3, n4] => match [n3, n4] {
+                [0x0, 0x7] => Op::DelayGet(n2),
+                [0x0, 0xA] => Op::KeyOpGet(n2),
+                [0x1, 0x5] => Op::DelaySet(n2),
+                [0x1, 0x8] => Op::SoundSet(n2),
+                [0x1, 0xE] => Op::MemIPlusEqVx(n2),
+                [0x2, 0x9] => Op::MemISetSprite(n2),
+                [0x3, 0x3] => Op::Bcd(n2),
+                [0x5, 0x5] => Op::RegDump(n2),
+                [0x6, 0x5] => Op::RegLoad(n2),
+                _ => panic!(panic_msg),
+            },
             _ => panic!(panic_msg),
         }
     }

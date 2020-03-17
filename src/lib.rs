@@ -1,23 +1,23 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
+use crate::graphics::Graphics;
+use minifb::{Key, KeyRepeat};
+use op::Op;
+use rand::{thread_rng, Rng};
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use op::Op;
-use rand::{Rng, thread_rng};
-use crate::graphics::Graphics;
-use minifb::{Key, KeyRepeat};
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
 const CALL_STACK_SIZE: usize = 96;
 const STARTING_MEMORY_BYTE: usize = 512;
-const GAME_FILE_MEMORY_SIZE: usize = MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE + STARTING_MEMORY_BYTE);
+const GAME_FILE_MEMORY_SIZE: usize =
+    MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE + STARTING_MEMORY_BYTE);
 const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
 
-mod op;
 mod graphics;
-
+mod op;
 
 // # Interpreter
 // * 4096 (0x1000) bytes of memory
@@ -55,21 +55,20 @@ struct FX0AMetadata {
 pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
 
-    sp: usize,          // stack pointer, 16 bits are needed but we use usize so we can index with it.
-                        // The stack pointer always points on beyond the top of the stack, i.e. onto
-                        // unallocated memory
-
-    pub addr: u16,     // address instruction register
-    pc: usize,          // program counter, 16 bits are needed but we use usize so we can index with it
+    sp: usize, // stack pointer, 16 bits are needed but we use usize so we can index with it.
+    // The stack pointer always points on beyond the top of the stack, i.e. onto
+    // unallocated memory
+    pub addr: u16, // address instruction register
+    pc: usize,     // program counter, 16 bits are needed but we use usize so we can index with it
 
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
     v: [u8; 16],
 
-    graphics: Graphics,      // 64x32 pixel monochrome screen
+    graphics: Graphics, // 64x32 pixel monochrome screen
 
-    delay_timer: u8,         // 60 Hz timer that can be set and read
-    sound_timer: u8,         // 60 Hz timer that beeps whenever it is nonzero
-    fx0a_metadata: FX0AMetadata // used to store state for instruction FX0A
+    delay_timer: u8,             // 60 Hz timer that can be set and read
+    sound_timer: u8,             // 60 Hz timer that beeps whenever it is nonzero
+    fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A
 }
 
 impl Interpreter {
@@ -99,7 +98,7 @@ impl Interpreter {
                 for i in 0..self.graphics.len() {
                     self.graphics.set(i, false);
                 }
-            },
+            }
             Op::Return => {
                 self.sp = self.sp - 1;
                 let lsb = self.memory[self.sp];
@@ -112,12 +111,11 @@ impl Interpreter {
                 let instr = two_nibbles_to_usize(msb, lsb);
 
                 self.pc = instr;
-
-            },
+            }
             Op::Goto(msb, b, lsb) => {
                 let instr = three_nibbles_to_usize(msb, b, lsb);
                 self.pc = instr;
-            },
+            }
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
                 let (pc_msb, pc_lsb) = usize_to_two_nibbles(self.pc);
@@ -128,7 +126,7 @@ impl Interpreter {
 
                 // jump to the subroutine
                 self.pc = three_nibbles_to_usize(msb, b, lsb);
-            },
+            }
             Op::CondVxEq(x, msb, lsb) => {
                 let reg = self.v[x as usize];
                 let byte = two_nibbles_to_u8(msb, lsb);
@@ -136,7 +134,7 @@ impl Interpreter {
                 if reg == byte {
                     self.skip_instruction();
                 }
-            },
+            }
             Op::CondVxNe(x, msb, lsb) => {
                 let reg = self.v[x as usize];
                 let byte = two_nibbles_to_u8(msb, lsb);
@@ -144,7 +142,7 @@ impl Interpreter {
                 if reg != byte {
                     self.skip_instruction();
                 }
-            },
+            }
             Op::CondVxVyEq(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
@@ -152,34 +150,34 @@ impl Interpreter {
                 if x_reg == y_reg {
                     self.skip_instruction();
                 }
-            },
+            }
             Op::ConstSetVx(x, msb, lsb) => {
                 let byte = two_nibbles_to_u8(msb, lsb);
                 self.v[x as usize] = byte;
-            },
+            }
             Op::ConstAddVx(x, msb, lsb) => {
                 let byte = two_nibbles_to_u8(msb, lsb);
                 self.v[x as usize] = self.v[x as usize] + byte;
-            },
+            }
             Op::AssignVyToVx(x, y) => {
                 let y_reg = self.v[y as usize];
                 self.v[x as usize] = y_reg;
-            },
+            }
             Op::BitOpOr(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
                 self.v[x as usize] = x_reg | y_reg;
-            },
+            }
             Op::BitOpAnd(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
                 self.v[x as usize] = x_reg & y_reg;
-            },
+            }
             Op::BitOpXor(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
                 self.v[x as usize] = x_reg ^ y_reg;
-            },
+            }
             Op::MathVxAddVy(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
@@ -188,12 +186,12 @@ impl Interpreter {
                 let (sum, did_overflow) = x_reg.overflowing_add(y_reg);
                 self.v[x as usize] = sum;
 
-                if did_overflow  {
+                if did_overflow {
                     self.v[0xf] = 1
                 } else {
                     self.v[0xf] = 0;
                 }
-            },
+            }
             Op::MathVxMinusVy(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
@@ -207,13 +205,13 @@ impl Interpreter {
                 } else {
                     self.v[0xf] = 1;
                 }
-            },
+            }
             Op::BitOpRtShift(x) => {
                 let x_reg = self.v[x as usize];
 
                 self.v[0xf] = x_reg & 0b1; // set VF to the value of the lsb
                 self.v[x as usize] = self.v[x as usize] >> 1;
-            },
+            }
             Op::MathVyMinusVx(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
@@ -226,13 +224,13 @@ impl Interpreter {
                 } else {
                     self.v[0xf] = 1;
                 }
-            },
+            }
             Op::BitOpLftShift(x) => {
                 let x_reg = self.v[x as usize];
 
                 self.v[0xf] = (x_reg & 0b10000000) >> 7; // set VF to the value of the msb
                 self.v[x as usize] = self.v[x as usize] << 1;
-            },
+            }
             Op::CondVxVyNe(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
@@ -240,17 +238,17 @@ impl Interpreter {
                 if x_reg != y_reg {
                     self.skip_instruction();
                 }
-            },
+            }
             Op::MemSetI(msb, b, lsb) => {
                 let addr = three_nibbles_to_u16(msb, b, lsb);
                 self.addr = addr;
-            },
+            }
             Op::GotoPlusV0(msb, b, lsb) => {
                 let addr = three_nibbles_to_u16(msb, b, lsb);
                 let v0 = self.v[0];
 
                 self.pc = addr as usize + v0 as usize;
-            },
+            }
             Op::Rand(x, msb, lsb) => {
                 let random_byte: u8 = thread_rng().gen();
 
@@ -260,7 +258,7 @@ impl Interpreter {
                 let new_reg_val = reg_val & eight_bits;
 
                 self.v[x as usize] = new_reg_val;
-            },
+            }
             Op::DispDraw(x, y, height) => {
                 let x_coord = self.v[x as usize];
                 let y_coord = self.v[y as usize];
@@ -272,12 +270,12 @@ impl Interpreter {
                     let byte = self.memory[self.addr as usize + i];
                     let row = i * 8 as usize;
                     for j in 0 as usize..8 as usize {
-                        let bit = ((byte >> (7 -j)) & 1) == 1;
+                        let bit = ((byte >> (7 - j)) & 1) == 1;
 
                         let gfx_offset = row + j;
 
-                        let is_different = should_set_vf != true &&
-                            self.graphics[gfx_start_idx + gfx_offset] != bit;
+                        let is_different = should_set_vf != true
+                            && self.graphics[gfx_start_idx + gfx_offset] != bit;
                         if is_different {
                             should_set_vf = true;
                         }
@@ -290,7 +288,7 @@ impl Interpreter {
                 } else {
                     self.v[0xf] = 0;
                 }
-            },
+            }
             Op::KeyOpEqVx(x) => {
                 let x_reg = self.v[x as usize];
                 let key_state = self.graphics.get_key_state(x_reg as usize);
@@ -298,7 +296,7 @@ impl Interpreter {
                 if key_state {
                     self.pc = self.pc + 2;
                 }
-            },
+            }
             Op::KeyOpNeVx(x) => {
                 let x_reg = self.v[x as usize];
                 let key_state = self.graphics.get_key_state(x_reg as usize);
@@ -306,15 +304,15 @@ impl Interpreter {
                 if !key_state {
                     self.pc = self.pc + 2;
                 }
-            },
+            }
             Op::DelayGet(x) => {
                 self.v[x as usize] = self.delay_timer;
-            },
+            }
             Op::KeyOpGet(x) => {
                 self.into_blocking_state(x);
-            },
+            }
 
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 
@@ -328,7 +326,9 @@ impl Interpreter {
     /// Handle and reset the Interpreter from a key press. Only gets called
     /// when the Interpreter is blocking as a result of a prior FX0A instruction
     fn out_of_blocking_state(&mut self, key_idx: u8) {
-        let reg_idx = self.fx0a_metadata.register
+        let reg_idx = self
+            .fx0a_metadata
+            .register
             .expect("invalid FXOA metadata state");
         self.v[reg_idx as usize] = key_idx;
         self.fx0a_metadata = FX0AMetadata::default();
@@ -366,14 +366,10 @@ impl Interpreter {
     }
 
     /// Draw the 64x32 pixel map
-    fn draw(&mut self) {
-
-    }
+    fn draw(&mut self) {}
 
     /// Check for any changes to keyboard input (keys pressed or unpressed)
-    fn update_key_inputs(&mut self) {
-
-    }
+    fn update_key_inputs(&mut self) {}
 
     /// step forward one cycle in the interpreter. Read the instruction
     /// at the program counter, decode it, execute it, and update any internal state
@@ -466,7 +462,13 @@ fn usize_to_three_nibbles(u: usize) -> (u8, u8, u8) {
     let b = ((u >> 4) & mask) as u8;
     let lsb = (u & mask) as u8;
 
-    assert!(msb <= 0xF && b <= 0xF && lsb <= 0xF, "msb: {}, b: {}, lsb: {}", msb, b, lsb);
+    assert!(
+        msb <= 0xF && b <= 0xF && lsb <= 0xF,
+        "msb: {}, b: {}, lsb: {}",
+        msb,
+        b,
+        lsb
+    );
 
     (msb, b, lsb)
 }
@@ -495,7 +497,9 @@ mod interpreter_tests {
 
             // set some graphics bits to true so we can later see the set to false;
             interpreter.graphics.set(0, true);
-            interpreter.graphics.set(interpreter.graphics.len() - 1, true);
+            interpreter
+                .graphics
+                .set(interpreter.graphics.len() - 1, true);
 
             interpreter.execute(op);
 
@@ -611,7 +615,6 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             // setup test
-
 
             let instr = 0x4A00;
             let op = Op::from(instr as u16);
@@ -843,7 +846,7 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[x as usize], 1);
-            assert_eq!(interpreter.v[y as usize],3);
+            assert_eq!(interpreter.v[y as usize], 3);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -923,7 +926,7 @@ mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[x as usize], 1);
-            assert_eq!(interpreter.v[y as usize],4);
+            assert_eq!(interpreter.v[y as usize], 4);
             assert_eq!(interpreter.v[0xf], 1);
         }
 
@@ -1045,7 +1048,8 @@ mod interpreter_tests {
                 assert_eq!(reg_val, rand_byte & eight_bits);
 
                 // check to make sure the op is changing (i.e. it's random)
-                if reg_val != rand_byte { // it changed
+                if reg_val != rand_byte {
+                    // it changed
                     num_different = num_different + 1;
                 }
 
@@ -1070,7 +1074,8 @@ mod interpreter_tests {
             let starting_addr = interpreter.addr as usize;
 
             let mut sprite = Vec::with_capacity((height * 8) as usize);
-            for i in 0 as usize..height as usize { // 8 bits in a byte
+            for i in 0 as usize..height as usize {
+                // 8 bits in a byte
 
                 let random_byte: u8 = thread_rng().gen();
 
@@ -1121,7 +1126,7 @@ mod interpreter_tests {
             for j in 0..8 {
                 let bit = ((arb_byte >> (7 - j)) & 1) == 1;
                 sprite.push(bit);
-                interpreter.graphics.set(gfx_addr +j as usize, bit);
+                interpreter.graphics.set(gfx_addr + j as usize, bit);
             }
 
             interpreter.execute(op);
@@ -1234,7 +1239,6 @@ mod interpreter_tests {
             // unnecessarily complicates the meaning of the struct. Since this op
             // is so simple we can handle skipping the test
         }
-
     }
 
     #[test]
@@ -1256,4 +1260,3 @@ mod interpreter_tests {
         assert_eq!(expected, three_nibbles_to_u16(n1, n2, n3));
     }
 }
-

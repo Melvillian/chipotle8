@@ -1,17 +1,16 @@
 /// A wrapper around a 64x32 bit buffer array that abstracts keyboard input and display output
-
 use fixedbitset::FixedBitSet;
-use std::ops::Index;
 use minifb::Key;
+use std::ops::Index;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
 
 pub struct Graphics {
     buffer: FixedBitSet,
-    font_set: [[u8; 5]; 16],  // stores the 16 5-byte hex font set
-    key_input: FixedBitSet,     // 16 bit hex keyboard input (0-F).
-    // Each bit stores the 1 (on) or 0 (off) keypress state
+    font_set: [[u8; 5]; 16], // stores the 16 5-byte hex font set
+    key_input: FixedBitSet,  // 16 bit hex keyboard input (0-F).
+                             // Each bit stores the 1 (on) or 0 (off) keypress state
 }
 
 impl Graphics {
@@ -19,22 +18,22 @@ impl Graphics {
         Graphics {
             buffer: FixedBitSet::with_capacity(WIDTH * HEIGHT),
             font_set: [
-                [0xF0, 0x90, 0x90, 0x90, 0xF0],  // 0
-                [0x20, 0x60, 0x20, 0x20, 0x70],  // 1
-                [0xF0, 0x10, 0xF0, 0x80, 0xF0],  // 2
-                [0xF0, 0x10, 0xF0, 0x10, 0xF0],  // 3
-                [0x90, 0x90, 0xF0, 0x10, 0x10],  // 4
-                [0xF0, 0x80, 0xF0, 0x10, 0xF0],  // 5
-                [0xF0, 0x80, 0xF0, 0x90, 0xF0],  // 6
-                [0xF0, 0x10, 0x20, 0x40, 0x40],  // 7
-                [0xF0, 0x90, 0xF0, 0x90, 0xF0],  // 8
-                [0xF0, 0x90, 0xF0, 0x10, 0xF0],  // 9
-                [0xF0, 0x90, 0xF0, 0x90, 0x90],  // 10
-                [0xE0, 0x90, 0xE0, 0x90, 0xE0],  // 11
-                [0xF0, 0x80, 0x80, 0x80, 0xF0],  // 12
-                [0xE0, 0x90, 0x90, 0x90, 0xE0],  // 13
-                [0xF0, 0x80, 0xF0, 0x80, 0xF0],  // 14
-                [0xF0, 0x80, 0xF0, 0x80, 0x80],  // 15
+                [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
+                [0x20, 0x60, 0x20, 0x20, 0x70], // 1
+                [0xF0, 0x10, 0xF0, 0x80, 0xF0], // 2
+                [0xF0, 0x10, 0xF0, 0x10, 0xF0], // 3
+                [0x90, 0x90, 0xF0, 0x10, 0x10], // 4
+                [0xF0, 0x80, 0xF0, 0x10, 0xF0], // 5
+                [0xF0, 0x80, 0xF0, 0x90, 0xF0], // 6
+                [0xF0, 0x10, 0x20, 0x40, 0x40], // 7
+                [0xF0, 0x90, 0xF0, 0x90, 0xF0], // 8
+                [0xF0, 0x90, 0xF0, 0x10, 0xF0], // 9
+                [0xF0, 0x90, 0xF0, 0x90, 0x90], // 10
+                [0xE0, 0x90, 0xE0, 0x90, 0xE0], // 11
+                [0xF0, 0x80, 0x80, 0x80, 0xF0], // 12
+                [0xE0, 0x90, 0x90, 0x90, 0xE0], // 13
+                [0xF0, 0x80, 0xF0, 0x80, 0xF0], // 14
+                [0xF0, 0x80, 0xF0, 0x80, 0x80], // 15
             ],
             key_input: FixedBitSet::with_capacity(16),
         }
@@ -74,18 +73,18 @@ impl Graphics {
             Key::Key2 => Some(2),
             Key::Key3 => Some(3),
             Key::Key4 => Some(0xC),
-            Key::Q    => Some(4),
-            Key::W    => Some(5),
-            Key::E    => Some(6),
-            Key::R    => Some(0xD),
-            Key::A    => Some(7),
-            Key::S    => Some(8),
-            Key::D    => Some(9),
-            Key::F    => Some(0xE),
-            Key::Z    => Some(0xA),
-            Key::X    => Some(0),
-            Key::C    => Some(0xB),
-            Key::V    => Some(0xF),
+            Key::Q => Some(4),
+            Key::W => Some(5),
+            Key::E => Some(6),
+            Key::R => Some(0xD),
+            Key::A => Some(7),
+            Key::S => Some(8),
+            Key::D => Some(9),
+            Key::F => Some(0xE),
+            Key::Z => Some(0xA),
+            Key::X => Some(0),
+            Key::C => Some(0xB),
+            Key::V => Some(0xF),
             _ => None,
         }
     }
