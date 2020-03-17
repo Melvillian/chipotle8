@@ -68,7 +68,7 @@ impl Graphics {
     /// +-+-+-+-+                +-+-+-+-+
     /// |A|0|B|F|                |Z|X|C|V|
     /// +-+-+-+-+                +-+-+-+-+
-    fn map_key(k: Key) -> Option<usize> {
+    pub fn map_key(k: Key) -> Option<usize> {
         match k {
             Key::Key1 => Some(1),
             Key::Key2 => Some(2),
@@ -104,8 +104,9 @@ impl Graphics {
         }
     }
 
-    pub fn get_key_state(&self, bit: usize) -> bool {
-        self.key_input[bit]
+    /// Return the bool value of the bit at the given index
+    pub fn get_key_state(&self, idx: usize) -> bool {
+        self.key_input[idx]
     }
 }
 

@@ -6,6 +6,7 @@ use std::io::Read;
 use op::Op;
 use rand::{Rng, thread_rng};
 use crate::graphics::Graphics;
+use minifb::{Key, KeyRepeat};
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -43,6 +44,14 @@ mod graphics;
 // # Graphics
 // 64x32 pixels
 
+/// Stores data needed to handle instruction FX0A
+#[derive(Default)]
+struct FX0AMetadata {
+    should_block_on_keypress: bool, // set to true if CPU is waiting on a keypress
+    last_key_pressed: Option<Key>,  // once a key is pressed store it here
+    register: Option<u8>,           // the register to store the pressed key in
+}
+
 pub struct Interpreter {
     pub memory: [u8; 4096], // 4k of RAM
 
@@ -60,6 +69,7 @@ pub struct Interpreter {
 
     delay_timer: u8,         // 60 Hz timer that can be set and read
     sound_timer: u8,         // 60 Hz timer that beeps whenever it is nonzero
+    fx0a_metadata: FX0AMetadata // used to store state for instruction FX0A
 }
 
 impl Interpreter {
@@ -73,6 +83,11 @@ impl Interpreter {
             graphics: Graphics::new(),
             delay_timer: 0,
             sound_timer: 0,
+            fx0a_metadata: FX0AMetadata {
+                should_block_on_keypress: false,
+                last_key_pressed: None,
+                register: None,
+            },
         }
     }
 
@@ -295,10 +310,53 @@ impl Interpreter {
             Op::DelayGet(x) => {
                 self.v[x as usize] = self.delay_timer;
             },
+            Op::KeyOpGet(x) => {
+                self.into_blocking_state(x);
+            },
 
             _ => unimplemented!()
         }
+    }
 
+    /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
+    /// the blocking state once a keypress gets detected
+    fn into_blocking_state(&mut self, reg: u8) {
+        self.fx0a_metadata.should_block_on_keypress = true;
+        self.fx0a_metadata.register = Some(reg);
+    }
+
+    /// Handle and reset the Interpreter from a key press. Only gets called
+    /// when the Interpreter is blocking as a result of a prior FX0A instruction
+    fn out_of_blocking_state(&mut self, key_idx: u8) {
+        let reg_idx = self.fx0a_metadata.register
+            .expect("invalid FXOA metadata state");
+        self.v[reg_idx as usize] = key_idx;
+        self.fx0a_metadata = FX0AMetadata::default();
+    }
+
+    /// Return the decoded Op at the current program counter. Does not increment the program counter
+    fn get_instr_at_pc(&self) -> Op {
+        let msb = self.memory[self.pc];
+        let lsb = self.memory[self.pc + 1];
+        Op::from(two_u8s_to_u16(msb, lsb))
+    }
+
+    /// Update the Interpreter state from possible key presses
+    fn handle_input(&mut self, keys_pressed: &Option<Vec<Key>>) {
+        keys_pressed.as_ref().map(|keys| {
+            for raw_key in keys {
+                Graphics::map_key(*raw_key).map(|k| {
+                    // first check if we're blocking on a key press and handle it
+                    if self.fx0a_metadata.should_block_on_keypress {
+                        self.out_of_blocking_state(k as u8);
+                    }
+
+                    // TODO handle setting newly downpressed keys and unsetting any keys that
+                    // are no longer being pressed. minifb doesn't give us a way to get keys_released
+                    // so we have to do it manually
+                });
+            }
+        });
     }
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
@@ -317,23 +375,18 @@ impl Interpreter {
 
     }
 
-    /// step forward one tick in the interpreter. Read the instruction
+    /// step forward one cycle in the interpreter. Read the instruction
     /// at the program counter, decode it, execute it, and update any internal state
-    pub fn tick(&mut self) {
-        let msb = self.memory[self.pc as usize];
-        self.pc = self.pc + 1;
-        let lsb = self.memory[self.pc as usize];
-        self.pc = self.pc + 1;
+    pub fn cycle(&mut self) {
+        if !self.fx0a_metadata.should_block_on_keypress {
+            self.execute(self.get_instr_at_pc());
 
-        let instr = two_nibbles_to_u16(msb, lsb);
-        let op = Op::from(instr);
+            if self.v[0xf] == 1 {
+                self.draw();
+            }
 
-        self.execute(op);
-
-        if self.v[0xf] == 1 { // a display bit changed by the previous Op?
-            self.draw();
+            self.pc = self.pc + 2;
         }
-
         self.update_key_inputs();
     }
 
@@ -418,9 +471,15 @@ fn usize_to_three_nibbles(u: usize) -> (u8, u8, u8) {
     (msb, b, lsb)
 }
 
+fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
+    ((msb as u16) << 8) | (lsb as u16)
+}
+
 #[cfg(test)]
 mod interpreter_tests {
     use super::*;
+    use std::thread;
+    use std::time::Duration;
 
     mod execute {
         use super::*;
@@ -1168,6 +1227,14 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.v[x as usize], 42);
         }
+
+        #[test]
+        fn key_get_block_op() {
+            // we can't test this without making Interpreter Send, which I think
+            // unnecessarily complicates the meaning of the struct. Since this op
+            // is so simple we can handle skipping the test
+        }
+
     }
 
     #[test]
