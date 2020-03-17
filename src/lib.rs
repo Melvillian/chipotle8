@@ -15,7 +15,8 @@ const STARTING_MEMORY_BYTE: usize = 512;
 const GAME_FILE_MEMORY_SIZE: usize =
     MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE + STARTING_MEMORY_BYTE);
 const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
-
+const FONT_DATA_START: usize = 0;
+const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 mod graphics;
 mod op;
 
@@ -73,7 +74,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter {
+        let mut interpreter = Interpreter {
             memory: [0; 4096],
             sp: 0,
             addr: 0,
@@ -87,7 +88,37 @@ impl Interpreter {
                 last_key_pressed: None,
                 register: None,
             },
+        };
+
+        // load font data into memory
+        let font_set: [[u8; NUM_BYTES_IN_FONT_CHAR as usize]; 16] = [
+            [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
+            [0x20, 0x60, 0x20, 0x20, 0x70], // 1
+            [0xF0, 0x10, 0xF0, 0x80, 0xF0], // 2
+            [0xF0, 0x10, 0xF0, 0x10, 0xF0], // 3
+            [0x90, 0x90, 0xF0, 0x10, 0x10], // 4
+            [0xF0, 0x80, 0xF0, 0x10, 0xF0], // 5
+            [0xF0, 0x80, 0xF0, 0x90, 0xF0], // 6
+            [0xF0, 0x10, 0x20, 0x40, 0x40], // 7
+            [0xF0, 0x90, 0xF0, 0x90, 0xF0], // 8
+            [0xF0, 0x90, 0xF0, 0x10, 0xF0], // 9
+            [0xF0, 0x90, 0xF0, 0x90, 0x90], // 10
+            [0xE0, 0x90, 0xE0, 0x90, 0xE0], // 11
+            [0xF0, 0x80, 0x80, 0x80, 0xF0], // 12
+            [0xE0, 0x90, 0x90, 0x90, 0xE0], // 13
+            [0xF0, 0x80, 0xF0, 0x80, 0xF0], // 14
+            [0xF0, 0x80, 0xF0, 0x80, 0x80], // 15
+        ];
+
+        let mut mem_idx = FONT_DATA_START;
+        for char_arr in font_set.iter() {
+            for byte in char_arr.iter() {
+                interpreter.memory[mem_idx] = *byte;
+                mem_idx += 1;
+            }
         }
+
+        interpreter
     }
 
     /// Update the state of the interpreter by running the operation
@@ -321,6 +352,19 @@ impl Interpreter {
                 } else {
                     self.v[0xF] = 0;
                 }
+            },
+            Op::MemISetSprite(x) => {
+                let reg = self.v[x as usize];
+
+                // the spec says the register at x must store a single hex digit, but in order
+                // to be safe we protect against undefined behavior if values greater than 0xF
+                // exist in the register by only using the first nible of data stored in the
+                // register
+                let least_nibble = reg & 0b1111;
+
+                let font_idx = (FONT_DATA_START as u8) + (least_nibble * NUM_BYTES_IN_FONT_CHAR);
+
+                self.addr = font_idx as u16;
             }
 
             _ => unimplemented!(),
@@ -1344,6 +1388,34 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.addr, 0);
             assert_eq!(interpreter.v[0xF], 1);
+        }
+
+        #[test]
+        fn mem_set_sprite_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xF129;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            interpreter.v[x as usize] = 1;
+            assert_eq!(interpreter.addr, 0);
+            let reg = interpreter.v[x as usize];
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, (reg * NUM_BYTES_IN_FONT_CHAR) as u16);
+
+            // now try with largest byte value, we should see that we only
+            // look at the least significant nibble, and so it should be char 255 % 16 === 15
+            interpreter.v[x as usize] = std::u8::MAX;
+            let reg = interpreter.v[x as usize];
+
+            let mut op = Op::from(instr as u16);
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, (15 * NUM_BYTES_IN_FONT_CHAR) as u16);
         }
     }
 

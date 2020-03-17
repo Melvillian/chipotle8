@@ -3,6 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="63a042d0-1204-4651-ad1f-0f5e1b1764f7" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/graphics.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/graphics.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
@@ -18,17 +19,17 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/lib.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="285">
-              <caret line="1336" column="46" lean-forward="true" selection-start-line="1336" selection-start-column="46" selection-end-line="1336" selection-end-column="46" />
+            <state relative-caret-position="367">
+              <caret line="1411" column="70" selection-start-line="1411" selection-start-column="70" selection-end-line="1411" selection-end-column="70" />
               <folding>
                 <element signature="e#13298#13299#0" expanded="true" />
                 <element signature="e#13335#13336#0" expanded="true" />
-                <element signature="e#16612#16613#0" expanded="true" />
-                <element signature="e#16653#16654#0" expanded="true" />
-                <element signature="e#16845#16846#0" expanded="true" />
-                <element signature="e#16888#16889#0" expanded="true" />
-                <element signature="e#17852#17853#0" expanded="true" />
-                <element signature="e#17893#17894#0" expanded="true" />
+                <element signature="e#17040#17041#0" expanded="true" />
+                <element signature="e#17081#17082#0" expanded="true" />
+                <element signature="e#17273#17274#0" expanded="true" />
+                <element signature="e#17316#17317#0" expanded="true" />
+                <element signature="e#18280#18281#0" expanded="true" />
+                <element signature="e#18321#18322#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -37,8 +38,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/graphics.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-291">
-              <caret line="124" column="35" selection-start-line="124" selection-start-column="11" selection-end-line="124" selection-end-column="35" />
+            <state relative-caret-position="175">
+              <caret line="13" selection-start-line="13" selection-end-line="13" />
               <folding>
                 <element signature="e#3719#3720#0" expanded="true" />
                 <element signature="e#3753#3754#0" expanded="true" />
@@ -103,12 +104,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>instruction</find>
-      <find>two_u8s_to</find>
-      <find>.graphics</find>
-      <find>handle_key</find>
-      <find>Repea</find>
-      <find>KeyRep</find>
       <find>out_of</find>
       <find>execute</find>
       <find>cycle(</find>
@@ -128,11 +123,17 @@
       <find>println</find>
       <find>16)</find>
       <find>print</find>
-      <find>DispCle</find>
-      <find>CallRca</find>
       <find>overflow</find>
       <find>overflowing</find>
       <find>u8::m</find>
+      <find>DispCle</find>
+      <find>CallRca</find>
+      <find>font</find>
+      <find>draw(</find>
+      <find>font_set</find>
+      <find>FONT_D</find>
+      <find>NUM_BY</find>
+      <find>blocking</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -143,9 +144,9 @@
       <list>
         <option value="$PROJECT_DIR$/src/bin/main.rs" />
         <option value="$PROJECT_DIR$/Cargo.toml" />
-        <option value="$PROJECT_DIR$/src/graphics.rs" />
         <option value="$PROJECT_DIR$/src/op.rs" />
         <option value="$PROJECT_DIR$/README.md" />
+        <option value="$PROJECT_DIR$/src/graphics.rs" />
         <option value="$PROJECT_DIR$/src/lib.rs" />
       </list>
     </option>
@@ -189,7 +190,7 @@
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1584471571519" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1584474133407" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
@@ -219,16 +220,15 @@
       <workItem from="1583881270547" duration="1979000" />
       <workItem from="1583898028063" duration="39899000" />
       <workItem from="1584140816487" duration="29576000" />
-      <workItem from="1584410772967" duration="11545000" />
+      <workItem from="1584410772967" duration="14043000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="82999000" />
+    <option name="totallyTimeSpent" value="85497000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="32" width="1920" height="1048" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.25375536" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -377,17 +377,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/graphics.rs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-291">
-          <caret line="124" column="35" selection-start-line="124" selection-start-column="11" selection-end-line="124" selection-end-column="35" />
-          <folding>
-            <element signature="e#3719#3720#0" expanded="true" />
-            <element signature="e#3753#3754#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/xml-rs-0.8.0/Readme.md">
       <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
         <state split_layout="SPLIT">
@@ -424,19 +413,30 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/src/graphics.rs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="13" selection-start-line="13" selection-end-line="13" />
+          <folding>
+            <element signature="e#3719#3720#0" expanded="true" />
+            <element signature="e#3753#3754#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/lib.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="285">
-          <caret line="1336" column="46" lean-forward="true" selection-start-line="1336" selection-start-column="46" selection-end-line="1336" selection-end-column="46" />
+        <state relative-caret-position="367">
+          <caret line="1411" column="70" selection-start-line="1411" selection-start-column="70" selection-end-line="1411" selection-end-column="70" />
           <folding>
             <element signature="e#13298#13299#0" expanded="true" />
             <element signature="e#13335#13336#0" expanded="true" />
-            <element signature="e#16612#16613#0" expanded="true" />
-            <element signature="e#16653#16654#0" expanded="true" />
-            <element signature="e#16845#16846#0" expanded="true" />
-            <element signature="e#16888#16889#0" expanded="true" />
-            <element signature="e#17852#17853#0" expanded="true" />
-            <element signature="e#17893#17894#0" expanded="true" />
+            <element signature="e#17040#17041#0" expanded="true" />
+            <element signature="e#17081#17082#0" expanded="true" />
+            <element signature="e#17273#17274#0" expanded="true" />
+            <element signature="e#17316#17317#0" expanded="true" />
+            <element signature="e#18280#18281#0" expanded="true" />
+            <element signature="e#18321#18322#0" expanded="true" />
           </folding>
         </state>
       </provider>
