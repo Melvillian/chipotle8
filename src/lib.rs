@@ -1,7 +1,7 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
 use crate::graphics::Graphics;
-use minifb::{Key, KeyRepeat};
+use minifb::{Key, KeyRepeat, Window};
 use op::Op;
 use rand::{thread_rng, Rng};
 use std::fs::File;
@@ -45,7 +45,7 @@ mod op;
 // 64x32 pixels
 
 /// Stores data needed to handle instruction FX0A
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq,)]
 struct FX0AMetadata {
     should_block_on_keypress: bool, // set to true if CPU is waiting on a keypress
     last_key_pressed: Option<Key>,  // once a key is pressed store it here
@@ -309,7 +309,7 @@ impl Interpreter {
                 self.v[x as usize] = self.delay_timer;
             }
             Op::KeyOpGet(x) => {
-                self.into_blocking_state(x);
+                self.go_to_blocking_state(x);
             }
 
             _ => unimplemented!(),
@@ -318,14 +318,14 @@ impl Interpreter {
 
     /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
     /// the blocking state once a keypress gets detected
-    fn into_blocking_state(&mut self, reg: u8) {
+    fn go_to_blocking_state(&mut self, reg: u8) {
         self.fx0a_metadata.should_block_on_keypress = true;
         self.fx0a_metadata.register = Some(reg);
     }
 
     /// Handle and reset the Interpreter from a key press. Only gets called
     /// when the Interpreter is blocking as a result of a prior FX0A instruction
-    fn out_of_blocking_state(&mut self, key_idx: u8) {
+    fn return_from_blocking_state(&mut self, key_idx: u8) {
         let reg_idx = self
             .fx0a_metadata
             .register
@@ -341,22 +341,48 @@ impl Interpreter {
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
-    /// Update the Interpreter state from possible key presses
-    fn handle_input(&mut self, keys_pressed: &Option<Vec<Key>>) {
-        keys_pressed.as_ref().map(|keys| {
-            for raw_key in keys {
-                Graphics::map_key(*raw_key).map(|k| {
-                    // first check if we're blocking on a key press and handle it
-                    if self.fx0a_metadata.should_block_on_keypress {
-                        self.out_of_blocking_state(k as u8);
-                    }
+    /// Given a Window with access to the system keyboard state, update the Interpreter's
+    /// keyboard input state
+    pub fn handle_input(&mut self, window: &Window) {
+        self.handle_input_inner(window.get_keys_pressed(KeyRepeat::Yes));
+    }
 
-                    // TODO handle setting newly downpressed keys and unsetting any keys that
-                    // are no longer being pressed. minifb doesn't give us a way to get keys_released
-                    // so we have to do it manually
-                });
-            }
+    /// Update the Interpreter state from possible key presses. Should only be called within
+    /// handle_input, which exists so when we're testing handle_input_inner we do not need
+    /// to create a Window struct, and only have to deal with Option<Vec<Key>>
+    fn handle_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
+        keys_pressed.as_ref().map(|keys| {
+            // TODO handle setting newly downpressed keys and unsetting any keys that
+            // are no longer being pressed. minifb doesn't give us a way to get keys_released
+            // so we have to do it manually
+            let key_idxs: Vec<usize> = keys.iter()
+                .map(Graphics::map_key)
+                .filter(Option::is_some)
+                .map(Option::unwrap)
+                .collect();
+
+            self.graphics.update_keyboard_with_vec(&key_idxs);
+
+            self.handle_fx0a_state(keys);
         });
+    }
+
+    /// Checks if we're in a blocking state, and if a valid key has been pressed
+    /// transitions out of the blocking state
+    fn handle_fx0a_state(&mut self, keys: &Vec<Key>) {
+        // check if the FX0A instruction has us in a blocking state and if we can now unblock
+        if self.fx0a_metadata.should_block_on_keypress {
+            let key_inputs: Vec<usize> = keys.iter()
+                .map(Graphics::map_key)
+                .filter(Option::is_some)
+                .map(Option::unwrap)
+                .collect();
+
+            // we choose of the first key because we have to choose SOME key, so why not the first?
+            key_inputs.get(0).map(|k| {
+                self.return_from_blocking_state(*k as u8);
+            });
+        }
     }
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
@@ -375,15 +401,25 @@ impl Interpreter {
     /// at the program counter, decode it, execute it, and update any internal state
     pub fn cycle(&mut self) {
         if !self.fx0a_metadata.should_block_on_keypress {
-            self.execute(self.get_instr_at_pc());
+            let op = self.get_instr_at_pc();
+            self.execute(op);
 
-            if self.v[0xf] == 1 {
+            if Interpreter::is_display_op(op) {
                 self.draw();
             }
 
+            // advance to the next instruction
             self.pc = self.pc + 2;
         }
-        self.update_key_inputs();
+    }
+
+    /// Return true if this op is related to the display. Later we use
+    /// this to decide if we should devote cycles to redrawing the graphics buffer
+    fn is_display_op(op: Op) -> bool {
+        match op {
+            Op::DispDraw(_, _, _) | Op::DispClear => true,
+            _ => false,
+        }
     }
 
     /// Read in a game file and initialize the necessary registers.
@@ -1169,7 +1205,7 @@ mod interpreter_tests {
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.graphics.handle_key_down(Key::Key1);
+            interpreter.graphics.handle_key_down(&Key::Key1);
             interpreter.execute(op);
 
             assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
@@ -1207,7 +1243,7 @@ mod interpreter_tests {
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.graphics.handle_key_down(Key::Key1);
+            interpreter.graphics.handle_key_down(&Key::Key1);
             interpreter.execute(op);
 
             assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
@@ -1235,9 +1271,42 @@ mod interpreter_tests {
 
         #[test]
         fn key_get_block_op() {
-            // we can't test this without making Interpreter Send, which I think
-            // unnecessarily complicates the meaning of the struct. Since this op
-            // is so simple we can handle skipping the test
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xF00A;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            // set instructions near the program counter so we can run `.cycle` correctly
+            interpreter.memory[interpreter.pc] = 0xF0;
+            interpreter.memory[interpreter.pc + 1] = 0x0A;
+            let arb_instr = 0x00E0;
+            interpreter.memory[interpreter.pc + 2] = 0x00;
+            interpreter.memory[interpreter.pc + 3] = 0xE0;
+
+            assert_eq!(interpreter.v[x as usize], 0);
+            assert_eq!(interpreter.pc, 0);
+            assert_eq!(interpreter.fx0a_metadata, FX0AMetadata::default());
+
+            interpreter.cycle();
+
+            assert_eq!(interpreter.fx0a_metadata.should_block_on_keypress, true);
+            assert_eq!(interpreter.fx0a_metadata.last_key_pressed, None);
+            assert_eq!(interpreter.fx0a_metadata.register, Some(x));
+            assert_eq!(interpreter.pc, 2);
+
+            // assert that cycle does not advance the program counter forward like it should
+            // if we're in a nonblocking state
+            interpreter.cycle();
+
+            assert_eq!(interpreter.pc, 2);
+
+            // fake key presses so we can verify program state resumes after we press some keys
+            interpreter.handle_input_inner(Some(vec!(Key::Key1)));
+
+            interpreter.cycle();
+
+            assert_eq!(interpreter.pc, 4);
         }
     }
 

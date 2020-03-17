@@ -1,5 +1,5 @@
 /// 35 CHIP 8 op codes. The u8's are guaranteed to be between 0x0 and 0xF
-#[derive(Debug, PartialOrd, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Op {
     // 0XXX
     // 0NNN 	Call 		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.

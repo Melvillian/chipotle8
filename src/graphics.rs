@@ -2,13 +2,16 @@
 use fixedbitset::FixedBitSet;
 use minifb::Key;
 use std::ops::Index;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
+const NUM_KEYS: usize = 16;
 
 pub struct Graphics {
     buffer: FixedBitSet,
-    font_set: [[u8; 5]; 16], // stores the 16 5-byte hex font set
+    font_set: [[u8; 5]; NUM_KEYS], // stores the 16 5-byte hex font set
     key_input: FixedBitSet,  // 16 bit hex keyboard input (0-F).
                              // Each bit stores the 1 (on) or 0 (off) keypress state
 }
@@ -35,7 +38,7 @@ impl Graphics {
                 [0xF0, 0x80, 0xF0, 0x80, 0xF0], // 14
                 [0xF0, 0x80, 0xF0, 0x80, 0x80], // 15
             ],
-            key_input: FixedBitSet::with_capacity(16),
+            key_input: FixedBitSet::with_capacity(NUM_KEYS),
         }
     }
 
@@ -67,7 +70,7 @@ impl Graphics {
     /// +-+-+-+-+                +-+-+-+-+
     /// |A|0|B|F|                |Z|X|C|V|
     /// +-+-+-+-+                +-+-+-+-+
-    pub fn map_key(k: Key) -> Option<usize> {
+    pub fn map_key(k: &Key) -> Option<usize> {
         match k {
             Key::Key1 => Some(1),
             Key::Key2 => Some(2),
@@ -90,16 +93,48 @@ impl Graphics {
     }
 
     /// Handle the key down event for one of the 16 possible keys
-    pub fn handle_key_down(&mut self, k: Key) {
+    pub fn handle_key_down(&mut self, k: &Key) {
         if let Some(idx) = Graphics::map_key(k) {
+            self.handle_key_down_inner(idx);
+        }
+    }
+
+    /// Handle the key down event for one of the 16 possible keys
+    fn handle_key_down_inner(&mut self, idx: usize) {
+        if idx >= 0 && idx <= 0xF {
             self.key_input.put(idx);
         }
     }
 
     /// Handle the key up event for one of the 16 possible keys
-    pub fn handle_key_up(&mut self, k: Key) {
+    pub fn handle_key_up(&mut self, k: &Key) {
         if let Some(idx) = Graphics::map_key(k) {
+            self.handle_key_up_inner(idx);
+        }
+    }
+
+    /// Handle the key down event for one of the 16 possible keys
+    fn handle_key_up_inner(&mut self, idx: usize) {
+        if idx >= 0 && idx <= 0xF {
             self.key_input.set(idx, false);
+        }
+    }
+
+    /// Given the indices of the keys pressed down on the system keyboard,
+    /// fire the appropriate key_up and key_down handlers
+    pub fn update_keyboard_with_vec(&mut self, key_idxs: &Vec<usize>) {
+        let set: HashSet<usize> = HashSet::from_iter(key_idxs.iter().cloned());
+
+        // check each of the 16 keys to see which have changed from up to down or vice versa
+        for i in 0..self.key_input.len() {
+            let system_key_is_down = set.contains(&i);
+            let interpreter_key_is_down = self.get_key_state(i);
+
+            if system_key_is_down && !interpreter_key_is_down {
+                self.handle_key_down_inner(i);
+            } else if !system_key_is_down && interpreter_key_is_down {
+                self.handle_key_up_inner(i);
+            }
         }
     }
 
