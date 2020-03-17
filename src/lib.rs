@@ -352,9 +352,6 @@ impl Interpreter {
     /// to create a Window struct, and only have to deal with Option<Vec<Key>>
     fn handle_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
         keys_pressed.as_ref().map(|keys| {
-            // TODO handle setting newly downpressed keys and unsetting any keys that
-            // are no longer being pressed. minifb doesn't give us a way to get keys_released
-            // so we have to do it manually
             let key_idxs: Vec<usize> = keys.iter()
                 .map(Graphics::map_key)
                 .filter(Option::is_some)

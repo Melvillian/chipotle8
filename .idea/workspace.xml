@@ -2,9 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="63a042d0-1204-4651-ad1f-0f5e1b1764f7" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/src/graphics.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/graphics.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/op.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/op.rs" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/target/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -16,11 +16,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="375">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/lib.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="175">
-              <caret line="1287" column="12" selection-start-line="1287" selection-start-column="12" selection-end-line="1287" selection-end-column="12" />
+            <state relative-caret-position="1461">
+              <caret line="353" column="42" selection-start-line="353" selection-start-column="42" selection-end-line="353" selection-end-column="42" />
               <folding>
                 <element signature="e#13298#13299#0" expanded="true" />
                 <element signature="e#13335#13336#0" expanded="true" />
@@ -31,6 +31,18 @@
                 <element signature="e#16424#16425#0" expanded="true" />
                 <element signature="e#16465#16466#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/README.md">
+          <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+            <state split_layout="SPLIT">
+              <first_editor relative-caret-position="497">
+                <caret line="21" column="2" selection-start-line="21" selection-start-column="2" selection-end-line="21" selection-end-column="2" />
+              </first_editor>
+              <second_editor />
             </state>
           </provider>
         </entry>
@@ -92,7 +104,7 @@
         <entry file="file://$PROJECT_DIR$/src/op.rs">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="367">
-              <caret line="88" column="34" selection-start-line="88" selection-start-column="34" selection-end-line="88" selection-end-column="34" />
+              <caret line="88" selection-start-line="88" selection-end-line="88" />
             </state>
           </provider>
         </entry>
@@ -126,7 +138,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>cycle</find>
       <find>tick</find>
       <find>should_block_on_keypress</find>
       <find>.pc +</find>
@@ -153,9 +164,10 @@
       <find>blocking_s</find>
       <find>::from</find>
       <find>CallRca</find>
-      <find>DispCle</find>
       <find>println</find>
       <find>16)</find>
+      <find>print</find>
+      <find>DispCle</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -169,6 +181,7 @@
         <option value="$PROJECT_DIR$/src/graphics.rs" />
         <option value="$PROJECT_DIR$/src/op.rs" />
         <option value="$PROJECT_DIR$/src/lib.rs" />
+        <option value="$PROJECT_DIR$/README.md" />
       </list>
     </option>
   </component>
@@ -182,7 +195,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="PackagesPane" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -205,13 +218,13 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
+      <pane id="PackagesPane" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="aspect.path.notification.shown" value="true" />
-    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1584418340748" />
+    <property name="com.android.tools.idea.instantapp.provision.ProvisionBeforeRunTaskProvider.myTimeStamp" value="1584461983706" />
     <property name="nodejs_interpreter_path.stuck_in_default_project" value="undefined stuck path" />
     <property name="nodejs_npm_path_reset_for_default_project" value="true" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
@@ -241,17 +254,18 @@
       <workItem from="1583881270547" duration="1979000" />
       <workItem from="1583898028063" duration="39899000" />
       <workItem from="1584140816487" duration="29576000" />
-      <workItem from="1584410772967" duration="7775000" />
+      <workItem from="1584410772967" duration="9727000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="79229000" />
+    <option name="totallyTimeSpent" value="81181000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="32" width="1920" height="1048" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" weight="0.25375536" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.25375536" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Designer" order="2" />
       <window_info id="Image Layers" order="3" />
@@ -265,7 +279,7 @@
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
-      <window_info active="true" anchor="bottom" id="Terminal" order="7" sideWeight="0.49946353" visible="true" weight="0.3025584" />
+      <window_info anchor="bottom" id="Terminal" order="7" sideWeight="0.49946353" visible="true" weight="0.3025584" />
       <window_info anchor="bottom" id="Docker" order="8" show_stripe_button="false" />
       <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.5005365" side_tool="true" weight="0.3025584" />
       <window_info anchor="bottom" id="Database Changes" order="10" />
@@ -412,7 +426,7 @@
     <entry file="file://$PROJECT_DIR$/src/op.rs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="367">
-          <caret line="88" column="34" selection-start-line="88" selection-start-column="34" selection-end-line="88" selection-end-column="34" />
+          <caret line="88" selection-start-line="88" selection-end-line="88" />
         </state>
       </provider>
     </entry>
@@ -427,10 +441,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$USER_HOME$/.cargo/registry/src/github.com-1ecc6299db9ec823/xml-rs-0.8.0/Readme.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor />
+          <second_editor />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/lib.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="175">
-          <caret line="1287" column="12" selection-start-line="1287" selection-start-column="12" selection-end-line="1287" selection-end-column="12" />
+        <state relative-caret-position="1461">
+          <caret line="353" column="42" selection-start-line="353" selection-start-column="42" selection-end-line="353" selection-end-column="42" />
           <folding>
             <element signature="e#13298#13299#0" expanded="true" />
             <element signature="e#13335#13336#0" expanded="true" />
@@ -441,6 +463,16 @@
             <element signature="e#16424#16425#0" expanded="true" />
             <element signature="e#16465#16466#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor relative-caret-position="497">
+            <caret line="21" column="2" selection-start-line="21" selection-start-column="2" selection-end-line="21" selection-end-column="2" />
+          </first_editor>
+          <second_editor />
         </state>
       </provider>
     </entry>
