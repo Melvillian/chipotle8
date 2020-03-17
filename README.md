@@ -7,6 +7,7 @@ There are many CHIP-8 implementations, so this one differentiates itself by runn
 ## TODO
 - [ ] Implement single player windowed interpreter
 - [ ] Test on non-Ubuntu systems
+- [ ] Implement server networking
 - [ ] Implement client library in Javascript (maybe some WASM thrown in for fun)
 - [ ] Play first networked Pong game!
 
