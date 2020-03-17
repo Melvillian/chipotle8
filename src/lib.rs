@@ -305,11 +305,22 @@ impl Interpreter {
                     self.pc = self.pc + 2;
                 }
             }
-            Op::DelayGet(x) => {
-                self.v[x as usize] = self.delay_timer;
-            }
-            Op::KeyOpGet(x) => {
-                self.go_to_blocking_state(x);
+            Op::DelayGet(x) => self.v[x as usize] = self.delay_timer,
+            Op::KeyOpGet(x) => self.go_to_blocking_state(x),
+            Op::DelaySet(x) => self.delay_timer = self.v[x as usize],
+            Op::SoundSet(x) => self.sound_timer = self.v[x as usize],
+            Op::MemIPlusEqVx(x) => {
+                let reg = self.v[x as usize];
+
+                let (sum, did_overflow) = self.addr.overflowing_add(reg as u16);
+                self.addr = sum;
+
+                // don't forget to set VF if there's overflow
+                if did_overflow {
+                    self.v[0xF] = 1;
+                } else {
+                    self.v[0xF] = 0;
+                }
             }
 
             _ => unimplemented!(),
@@ -1304,6 +1315,35 @@ mod interpreter_tests {
             interpreter.cycle();
 
             assert_eq!(interpreter.pc, 4);
+        }
+
+        #[test]
+        fn mem_set_add_vx_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xF01E;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            assert_eq!(interpreter.addr, 0);
+
+            // artificially set the register at x so the `addr` field will get set to that value
+            // after the op gets run
+            interpreter.v[x as usize] = 42;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, 42);
+            assert_eq!(interpreter.v[0xF], 0);
+
+            // now try with overflowing
+            interpreter.addr = std::u16::MAX;
+            interpreter.v[x as usize] = 1;
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, 0);
+            assert_eq!(interpreter.v[0xF], 1);
         }
     }
 
