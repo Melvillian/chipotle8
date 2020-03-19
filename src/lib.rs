@@ -90,7 +90,10 @@ impl Interpreter {
             },
         };
 
-        // load font data into memory
+        // The first 512 bytes of memory were originally used to store the interpreter
+        // code itself, but since we are writing an emulator and don't need to store
+        // interpreter code in the interpreter's memory those bytes are free for us to
+        // put whatever we want there. So we put the font data there.
         let font_set: [[u8; NUM_BYTES_IN_FONT_CHAR as usize]; 16] = [
             [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
             [0x20, 0x60, 0x20, 0x20, 0x70], // 1
@@ -371,7 +374,6 @@ impl Interpreter {
                 let ascii_offset = 48;
 
                 let decimal_repr = format!("{:03}", reg);
-                println!("{}", decimal_repr);
                 let addr_usize = self.addr as usize;
                 self.memory[addr_usize + 0 as usize] = decimal_repr.get(0..1)
                     .unwrap().as_bytes()[0] - ascii_offset;
@@ -379,7 +381,11 @@ impl Interpreter {
                     .unwrap().as_bytes()[0] - ascii_offset;
                 self.memory[addr_usize + 2 as usize] = decimal_repr.get(2..3)
                     .unwrap().as_bytes()[0] - ascii_offset;
-
+            },
+            Op::RegDump(x) => {
+                for i in 0..x + 1 {
+                    self.memory[self.addr as usize + i as usize] = self.v[i as usize];
+                }
             }
 
             _ => unimplemented!(),
@@ -1451,6 +1457,40 @@ mod interpreter_tests {
             assert_eq!(interpreter.memory[(interpreter.addr + 1) as usize], 2);
             assert_eq!(interpreter.memory[(interpreter.addr + 2) as usize], 3);
         }
+
+        #[test]
+        fn reg_dump_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xFA55;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            // fake putting values in the registers so our op will put them in the x
+            // bytes starting at memory location interpreter.addr
+            for i in 0..x + 1 {
+                interpreter.v[i as usize] = i;
+            }
+
+            interpreter.addr = STARTING_MEMORY_BYTE as u16;
+            for i in 0..16 {
+                assert_eq!(interpreter.memory[(interpreter.addr + i) as usize], 0);
+            }
+
+            interpreter.execute(op);
+
+            interpreter.addr = STARTING_MEMORY_BYTE as u16;
+            for i in 0u8..16u8 {
+                if (i <= x) {
+                    // these should have been set from the register values
+                    assert_eq!(interpreter.memory[(interpreter.addr + i as u16) as usize], i);
+                } else {
+                    // these should not have changed
+                    assert_eq!(interpreter.memory[(interpreter.addr + i as u16) as usize], 0);
+                }
+            }
+        }
+
     }
 
     #[test]
