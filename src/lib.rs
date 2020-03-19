@@ -464,22 +464,26 @@ impl Interpreter {
     }
 
     /// Draw the 64x32 pixel map
-    fn draw(&mut self) {}
+    pub fn draw(&mut self, window: &Window, op: Op) {
+        if Interpreter::is_display_op(op) {
+        }
+    }
 
-    /// step forward one cycle in the interpreter. Read the instruction
-    /// at the program counter, decode it, execute it, and update any internal state
-    pub fn cycle(&mut self) {
+    /// step forward one cycle in the interpreter and return Op executed this cycle or None if
+    /// we're currently blocking. A cycle consists of:
+    /// 1. read the instruction at the program counter
+    /// 2. decode it
+    /// 3. execute it
+    pub fn cycle(&mut self) -> Op {
+        let op = self.get_instr_at_pc();
         if !self.fx0a_metadata.should_block_on_keypress {
-            let op = self.get_instr_at_pc();
             self.execute(op);
-
-            if Interpreter::is_display_op(op) {
-                self.draw();
-            }
 
             // advance to the next instruction
             self.pc = self.pc + 2;
         }
+
+        op
     }
 
     /// Return true if this op is related to the display. Later we use
@@ -585,10 +589,8 @@ fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
 }
 
 #[cfg(test)]
-mod interpreter_tests {
+pub mod interpreter_tests {
     use super::*;
-    use std::thread;
-    use std::time::Duration;
 
     mod execute {
         use super::*;
@@ -1130,9 +1132,8 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xC012;
-            let mut op = Op::from(instr as u16);
-            let (x, msb, lsb) = usize_to_three_nibbles(instr);
-            let eight_bits = two_nibbles_to_u8(msb, lsb);
+            let op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
 
             let mut prev_byte = 0xBC;
 
@@ -1167,7 +1168,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xD012;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
             // set x and y regs to arbitrary values
@@ -1215,7 +1216,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xD011; // height is 1, so only 8 bits
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
             // set x and y regs to arbitrary values
@@ -1259,13 +1260,16 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xE09E;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             let x_reg = interpreter.v[x as usize] as usize;
 
             assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
             assert_eq!(interpreter.pc, 0);
 
+            // fake pressing down and up the key in reg
+            interpreter.graphics.handle_key_down(&Key::Key1);
+            interpreter.graphics.handle_key_up(&Key::Key1);
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc, 0);
@@ -1276,7 +1280,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xE09E;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.v[x as usize] = 1; // setup x register for keypress
             let x_reg = interpreter.v[x as usize] as usize;
@@ -1297,7 +1301,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xE0A1;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             let x_reg = interpreter.v[x as usize] as usize;
 
@@ -1314,7 +1318,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xE0A1;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.v[x as usize] = 1; // setup x register for keypress
             let x_reg = interpreter.v[x as usize] as usize;
@@ -1335,7 +1339,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xF007;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             assert_eq!(interpreter.v[x as usize], 0);
@@ -1353,14 +1357,15 @@ mod interpreter_tests {
         fn key_get_block_op() {
             let mut interpreter = Interpreter::new();
 
-            let instr: usize = 0xF00A;
-            let mut op = Op::from(instr as u16);
+            let instr = 0xF00A;
             let (x, _, _) = usize_to_three_nibbles(instr);
 
-            // set instructions near the program counter so we can run `.cycle` correctly
+            // set the 0xFX0A near the program counter so we can run `.cycle` correctly
             interpreter.memory[interpreter.pc] = 0xF0;
             interpreter.memory[interpreter.pc + 1] = 0x0A;
-            let arb_instr = 0x00E0;
+
+            // set the 2nd instruction to be some arbitrary instruction, it doesn't matter what it is
+            // so we we choose 0x00EO (DispClear)
             interpreter.memory[interpreter.pc + 2] = 0x00;
             interpreter.memory[interpreter.pc + 3] = 0xE0;
 
@@ -1394,7 +1399,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xF01E;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             assert_eq!(interpreter.addr, 0);
@@ -1423,12 +1428,12 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xF129;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             interpreter.v[x as usize] = 1;
-            assert_eq!(interpreter.addr, 0);
             let reg = interpreter.v[x as usize];
+            assert_eq!(interpreter.addr, 0);
 
             interpreter.execute(op);
 
@@ -1437,9 +1442,8 @@ mod interpreter_tests {
             // now try with largest byte value, we should see that we only
             // look at the least significant nibble, and so it should be char 255 % 16 === 15
             interpreter.v[x as usize] = std::u8::MAX;
-            let reg = interpreter.v[x as usize];
 
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
 
             interpreter.execute(op);
 
@@ -1451,7 +1455,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xF133;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             assert_eq!(interpreter.addr, 0);
@@ -1470,7 +1474,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xFA55;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             // fake putting values in the registers so our op will put them in the x
@@ -1488,7 +1492,7 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.addr, STARTING_MEMORY_BYTE as u16);
             for i in 0u8..16u8 {
-                if (i <= x) {
+                if i <= x {
                     // these should have been set from the register values
                     assert_eq!(interpreter.memory[(interpreter.addr + i as u16) as usize], i);
                 } else {
@@ -1503,7 +1507,7 @@ mod interpreter_tests {
             let mut interpreter = Interpreter::new();
 
             let instr: usize = 0xFA65;
-            let mut op = Op::from(instr as u16);
+            let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             // fake putting values in memory so our op will put them in the x
@@ -1521,7 +1525,7 @@ mod interpreter_tests {
 
             assert_eq!(interpreter.addr, STARTING_MEMORY_BYTE as u16);
             for i in 0u8..16u8 {
-                if (i <= x) {
+                if i <= x {
                     // these should have been set from the memory values
                     assert_eq!(interpreter.v[i as usize], i);
                 } else {
