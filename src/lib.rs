@@ -83,11 +83,10 @@ pub struct Interpreter {
 impl Interpreter {
     pub fn new<L : Into<Option<slog::Logger>>>(logger: L) -> Self {
 
-        //let logger = builder.build().unwrap();
         let log = logger.into().unwrap_or({
             let mut builder = TerminalLoggerBuilder::new();
             builder.level(Severity::Info);
-            builder.destination(Destination::Stderr);
+            builder.destination(Destination::Stdout);
             let built_log = builder.build().unwrap();
 
             debug!(built_log, "no logger given, defaulting to slog's terminal logger");
@@ -145,9 +144,13 @@ impl Interpreter {
         interpreter
     }
 
+    pub fn get_logger(&self) -> &Logger {
+        &self.logger
+    }
+
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
-        debug!(self.logger, "executing op: {:?}", op);
+        info!(self.logger, "executing op: {:?}", op);
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
@@ -164,9 +167,7 @@ impl Interpreter {
                 let msb = self.memory[self.sp];
                 self.memory[self.sp] = 0; // zero out stack
 
-                let instr = two_nibbles_to_usize(msb, lsb);
-
-                self.pc = instr;
+                self.pc = two_u8s_to_u16(msb, lsb) as usize;
             }
             Op::Goto(msb, b, lsb) => {
                 let instr = three_nibbles_to_usize(msb, b, lsb);
@@ -174,11 +175,11 @@ impl Interpreter {
             }
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
-                let (pc_msb, pc_lsb) = usize_to_two_nibbles(self.pc);
+                let (pc_msb, pc_lsb) = u16_to_two_u8s(self.pc as u16);
                 self.memory[self.sp] = pc_msb;
-                self.sp = self.sp + 1;
+                self.sp+=1;
                 self.memory[self.sp] = pc_lsb;
-                self.sp = self.sp + 1;
+                self.sp+=1;
 
                 // jump to the subroutine
                 self.pc = three_nibbles_to_usize(msb, b, lsb);
@@ -435,7 +436,7 @@ impl Interpreter {
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
-        debug!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
+        info!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
@@ -491,8 +492,17 @@ impl Interpreter {
         if self.prev_op.is_none() || Interpreter::is_display_op(self.prev_op.unwrap()) {
             // TODO don't hardcode window size. Make a Display struct that handles resizing
             // once I've got the Interpreter working
+
+            // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
+            // bitmap to a 32x32 bitmap of the same color
+            let mut display = Vec::with_capacity(32 * graphics::WIDTH * 32 * graphics::HEIGHT);
+            for (_, pix) in self.graphics.buffer().iter().enumerate() {
+                for _ in 0..(32 * 32) {
+                    display.push(*pix);
+                }
+            }
             window
-                .update_with_buffer(self.graphics.buffer(), graphics::WIDTH, graphics::HEIGHT)
+                .update_with_buffer(&display, graphics::WIDTH, graphics::HEIGHT)
                 .unwrap();
         }
     }
@@ -505,7 +515,10 @@ impl Interpreter {
     pub fn cycle(&mut self) -> Op {
         let op = self.get_instr_at_pc();
         if !self.fx0a_metadata.should_block_on_keypress {
-            self.execute(op);
+            info!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+              self.sp, self.memory[STACK_START..STACK_START+8].to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+
+                  self.execute(op);
 
             // advance to the next instruction
             self.prev_op = Some(op);
@@ -513,8 +526,8 @@ impl Interpreter {
 
             self.decrement_timers();
 
-            debug!(self.logger, "state after cycle: (sp: {}, addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
-            self.sp, self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+            info!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+                  self.sp, self.memory[STACK_START..STACK_START+8].to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
 
         op
@@ -636,6 +649,12 @@ fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | (lsb as u16)
 }
 
+fn u16_to_two_u8s(instr: u16) -> (u8, u8) {
+    let msb = ((instr >> 8) & 0xFF) as u8;
+    let lsb = (instr & 0xFF) as u8;
+    (msb, lsb)
+}
+
 #[cfg(test)]
 pub mod interpreter_tests {
     use super::*;
@@ -675,12 +694,12 @@ pub mod interpreter_tests {
             // fake call a function so we set a return address on the stack. We use arbitrary return
             // address 0x01AA
             let arb_addr = 0x001A;
-            let (msb, lsb) = usize_to_two_nibbles(arb_addr);
+            let (msb, lsb) = u16_to_two_u8s(arb_addr);
             interpreter.memory[interpreter.sp] = msb;
-            interpreter.sp = interpreter.sp + 1;
+            interpreter.sp+=1;
 
             interpreter.memory[interpreter.sp] = lsb;
-            interpreter.sp = interpreter.sp + 1;
+            interpreter.sp+=1;
 
             interpreter.pc = 0x090B; // arbitrary position for the program counter
 
@@ -688,7 +707,7 @@ pub mod interpreter_tests {
             let op = Op::from(instr);
             interpreter.execute(op);
 
-            assert_eq!(interpreter.pc, arb_addr);
+            assert_eq!(interpreter.pc, arb_addr as usize);
             assert_eq!(interpreter.sp, 0);
 
             assert_eq!(interpreter.memory[interpreter.sp], 0);
@@ -716,7 +735,7 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.sp, 0);
 
             // fake the interpreter in the middle of execution by setting pc to arbitrary address
-            let arb_addr = 0xFAB;
+            let arb_addr = 0x0FAB;
             interpreter.pc = arb_addr;
 
             let instr = 0x2DEF;
@@ -726,7 +745,7 @@ pub mod interpreter_tests {
 
             assert_eq!(interpreter.pc, addr);
             assert_eq!(interpreter.sp, 2);
-            let (msb, lsb) = usize_to_two_nibbles(arb_addr);
+            let (msb, lsb) = u16_to_two_u8s(arb_addr as u16);
             assert_eq!(interpreter.memory[interpreter.sp - 1], lsb);
             assert_eq!(interpreter.memory[interpreter.sp - 2], msb);
         }
