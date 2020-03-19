@@ -22,7 +22,7 @@ fn main() -> Result<(), Error> {
     // Limit to max ~60 fps update rate
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
-    let mut interpreter = crate::Interpreter::new();
+    let mut interpreter = crate::Interpreter::new(None);
     let game_file = File::open("pong.ch8").unwrap();
     interpreter.initialize(game_file);
 

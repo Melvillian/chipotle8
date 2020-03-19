@@ -7,6 +7,11 @@ use rand::{thread_rng, Rng};
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
+use slog::info;
+use sloggers::Build;
+use sloggers::terminal::{TerminalLoggerBuilder, Destination};
+use sloggers::types::Severity;
+use slog::Logger;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -71,11 +76,17 @@ pub struct Interpreter {
 
     delay_timer: u8,             // 60 Hz timer that can be set and read
     sound_timer: u8,             // 60 Hz timer that beeps whenever it is nonzero
-    fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A
+    fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
+    logger: Logger,
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub fn new<L : Into<Option<slog::Logger>>>(logger: L) -> Self {
+        let mut builder = TerminalLoggerBuilder::new();
+        builder.level(Severity::Debug);
+        builder.destination(Destination::Stderr);
+
+        let logger = builder.build().unwrap();
         let mut interpreter = Interpreter {
             memory: [0; 4096],
             sp: 0,
@@ -91,6 +102,7 @@ impl Interpreter {
                 last_key_pressed: None,
                 register: None,
             },
+            logger: logger,
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter
