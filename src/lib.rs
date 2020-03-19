@@ -17,6 +17,7 @@ const GAME_FILE_MEMORY_SIZE: usize =
 const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
+
 mod graphics;
 mod op;
 
@@ -60,6 +61,7 @@ pub struct Interpreter {
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
     pub addr: u16, // address instruction register
+    prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize,     // program counter, 16 bits are needed but we use usize so we can index with it
 
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
@@ -78,6 +80,7 @@ impl Interpreter {
             memory: [0; 4096],
             sp: 0,
             addr: 0,
+            prev_op: None,
             pc: 0,
             v: [0; 16],
             graphics: Graphics::new(),
@@ -300,16 +303,16 @@ impl Interpreter {
                     let byte = self.memory[self.addr as usize + i];
                     let row = i * 8 as usize;
                     for j in 0 as usize..8 as usize {
-                        let bit = ((byte >> (7 - j)) & 1) == 1;
+                        let is_black = ((byte >> (7 - j)) & 1) == 1;
 
                         let gfx_offset = row + j;
 
                         let is_different = should_set_vf != true
-                            && self.graphics[gfx_start_idx + gfx_offset] != bit;
+                            && self.graphics.is_collision(gfx_start_idx + gfx_offset, is_black);
                         if is_different {
                             should_set_vf = true;
                         }
-                        self.graphics.set(gfx_start_idx + gfx_offset, bit);
+                        self.graphics.set(gfx_start_idx + gfx_offset, is_black);
                     }
                 }
 
@@ -324,7 +327,7 @@ impl Interpreter {
                 let key_state = self.graphics.get_key_state(x_reg as usize);
 
                 if key_state {
-                    self.pc = self.pc + 2;
+                    self.skip_instruction();
                 }
             }
             Op::KeyOpNeVx(x) => {
@@ -332,7 +335,7 @@ impl Interpreter {
                 let key_state = self.graphics.get_key_state(x_reg as usize);
 
                 if !key_state {
-                    self.pc = self.pc + 2;
+                    self.skip_instruction();
                 }
             }
             Op::DelayGet(x) => self.v[x as usize] = self.delay_timer,
@@ -464,8 +467,13 @@ impl Interpreter {
     }
 
     /// Draw the 64x32 pixel map
-    pub fn draw(&mut self, window: &Window, op: Op) {
-        if Interpreter::is_display_op(op) {
+    pub fn draw(&self, window: &mut Window) {
+        if self.prev_op.is_none() || Interpreter::is_display_op(self.prev_op.unwrap()) {
+            // TODO don't hardcode window size. Make a Display struct that handles resizing
+            // once I've got the Interpreter working
+            window
+                .update_with_buffer(self.graphics.buffer(), graphics::WIDTH, graphics::HEIGHT)
+                .unwrap();
         }
     }
 
@@ -480,6 +488,7 @@ impl Interpreter {
             self.execute(op);
 
             // advance to the next instruction
+            self.prev_op = Some(op);
             self.pc = self.pc + 2;
         }
 

@@ -5,12 +5,14 @@ use std::ops::Index;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 32;
+pub const WIDTH: usize = 64;
+pub const HEIGHT: usize = 32;
 const NUM_KEYS: usize = 16;
+const BLACK_RGB: u32 = 0xFFFFFF;
+const WHITE_RGB: u32 = 0x000000;
 
 pub struct Graphics {
-    buffer: FixedBitSet,
+    buffer: [u32; WIDTH * HEIGHT],
     key_input: FixedBitSet,  // 16 bit hex keyboard input (0-F).
                              // Each bit stores the 1 (on) or 0 (off) keypress state
 }
@@ -18,16 +20,20 @@ pub struct Graphics {
 impl Graphics {
     pub fn new() -> Self {
         Graphics {
-            buffer: FixedBitSet::with_capacity(WIDTH * HEIGHT),
+            buffer: [0; WIDTH * HEIGHT],
             key_input: FixedBitSet::with_capacity(NUM_KEYS),
         }
+    }
+
+    pub fn buffer(&self) -> &[u32] {
+        &self.buffer
     }
 
     pub fn len(&self) -> usize {
         return WIDTH * HEIGHT;
     }
 
-    /// Given x and y coordinate for a bit in the buffer, return the corresponding
+    /// Given x (column) and y (row) coordinates for a bit in the buffer, return the corresponding
     /// index of that bit in the buffer
     pub fn get_graphics_idx(x: u8, y: u8) -> usize {
         let column = x as usize;
@@ -37,7 +43,11 @@ impl Graphics {
     }
 
     pub fn set(&mut self, bit: usize, enabled: bool) {
-        self.buffer.set(bit, enabled)
+        if enabled {
+            self.buffer[bit] = BLACK_RGB;
+        } else {
+            self.buffer[bit] = WHITE_RGB;
+        }
     }
 
     /// We use the following mapping for the 16 bit hex keyboard
@@ -73,6 +83,9 @@ impl Graphics {
         }
     }
 
+    pub fn is_collision(&self, idx: usize, new_pixel_is_black: bool) -> bool {
+        self[idx] == BLACK_RGB && !new_pixel_is_black
+    }
 
     /// Handle the key down event for one of the 16 possible keys
     #[cfg(test)]
@@ -129,7 +142,7 @@ impl Graphics {
 }
 
 impl Index<usize> for Graphics {
-    type Output = bool;
+    type Output = u32;
 
     #[inline]
     fn index(&self, bit: usize) -> &Self::Output {
