@@ -73,7 +73,9 @@ impl Graphics {
         }
     }
 
+
     /// Handle the key down event for one of the 16 possible keys
+    #[cfg(test)]
     pub fn handle_key_down(&mut self, k: &Key) {
         if let Some(idx) = Graphics::map_key(k) {
             self.handle_key_down_inner(idx);
@@ -82,12 +84,13 @@ impl Graphics {
 
     /// Handle the key down event for one of the 16 possible keys
     fn handle_key_down_inner(&mut self, idx: usize) {
-        if idx >= 0 && idx <= 0xF {
+        if idx <= 0xF {
             self.key_input.put(idx);
         }
     }
 
     /// Handle the key up event for one of the 16 possible keys
+    #[cfg(test)]
     pub fn handle_key_up(&mut self, k: &Key) {
         if let Some(idx) = Graphics::map_key(k) {
             self.handle_key_up_inner(idx);
@@ -96,7 +99,7 @@ impl Graphics {
 
     /// Handle the key down event for one of the 16 possible keys
     fn handle_key_up_inner(&mut self, idx: usize) {
-        if idx >= 0 && idx <= 0xF {
+        if idx <= 0xF {
             self.key_input.set(idx, false);
         }
     }

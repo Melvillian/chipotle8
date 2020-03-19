@@ -285,19 +285,15 @@ impl Interpreter {
             }
             Op::Rand(x, msb, lsb) => {
                 let random_byte: u8 = thread_rng().gen();
-
-                let reg_val = self.v[x as usize];
                 let eight_bits = two_nibbles_to_u8(msb, lsb);
 
-                let new_reg_val = reg_val & eight_bits;
-
-                self.v[x as usize] = new_reg_val;
+                self.v[x as usize] = random_byte & eight_bits;
             }
             Op::DispDraw(x, y, height) => {
                 let x_coord = self.v[x as usize];
                 let y_coord = self.v[y as usize];
 
-                let gfx_start_idx = Graphics::get_graphics_idx(x, y);
+                let gfx_start_idx = Graphics::get_graphics_idx(x_coord, y_coord);
 
                 let mut should_set_vf = false;
                 for i in 0 as usize..height as usize {
@@ -392,7 +388,6 @@ impl Interpreter {
                     self.v[i as usize] = self.memory[self.addr as usize + i as usize];
                 }
             }
-            _ => panic!("unknown opcode: {:?}", op),
         }
     }
 
@@ -423,14 +418,14 @@ impl Interpreter {
 
     /// Given a Window with access to the system keyboard state, update the Interpreter's
     /// keyboard input state
-    pub fn handle_input(&mut self, window: &Window) {
-        self.handle_input_inner(window.get_keys_pressed(KeyRepeat::Yes));
+    pub fn handle_key_input(&mut self, window: &Window) {
+        self.handle_key_input_inner(window.get_keys_pressed(KeyRepeat::Yes));
     }
 
     /// Update the Interpreter state from possible key presses. Should only be called within
-    /// handle_input, which exists so when we're testing handle_input_inner we do not need
+    /// handle_key_input, which exists so when we're testing handle_key_input_inner we do not need
     /// to create a Window struct, and only have to deal with Option<Vec<Key>>
-    fn handle_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
+    fn handle_key_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
         keys_pressed.as_ref().map(|keys| {
             let key_idxs: Vec<usize> = keys.iter()
                 .map(Graphics::map_key)
@@ -470,9 +465,6 @@ impl Interpreter {
 
     /// Draw the 64x32 pixel map
     fn draw(&mut self) {}
-
-    /// Check for any changes to keyboard input (keys pressed or unpressed)
-    fn update_key_inputs(&mut self) {}
 
     /// step forward one cycle in the interpreter. Read the instruction
     /// at the program counter, decode it, execute it, and update any internal state
@@ -535,6 +527,7 @@ fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
 /// Take the msb and lsb u8s and merge them into a single 16. Used
 /// to convert two 8-bit pieces of data in memory into a single 16-bit
 /// instruction.
+#[cfg(test)]
 fn two_nibbles_to_u16(msb: u8, lsb: u8) -> u16 {
     two_nibbles_to_u8(msb, lsb) as u16
 }
@@ -568,6 +561,7 @@ fn three_nibbles_to_usize(msb: u8, b: u8, lsb: u8) -> usize {
     three_nibbles_to_u16(msb, b, lsb) as usize
 }
 
+#[cfg(test)]
 fn usize_to_three_nibbles(u: usize) -> (u8, u8, u8) {
     let mask: usize = 0xF;
 
@@ -1140,14 +1134,13 @@ mod interpreter_tests {
             let (x, msb, lsb) = usize_to_three_nibbles(instr);
             let eight_bits = two_nibbles_to_u8(msb, lsb);
 
-            let rand_byte = 0xBC;
-            let mut prev_byte = rand_byte;
+            let mut prev_byte = 0xBC;
 
             // set reg to arbitrary byte so we can check that it changed later
-            interpreter.v[x as usize] = rand_byte;
+            interpreter.v[x as usize] = prev_byte;
 
             // I don't want to bother setting up tests for randomness on this op, so because I'm
-            // lazy I'm going to run the op 10 times and makes sure at least 1 of those times it
+            // lazy I'm going to run the op 10 times and makes sure at least 5 of those times it
             // changes to reg's value to a different number. This test will produce a false negative
             // very infrequently, which I can live with.
 
@@ -1157,16 +1150,13 @@ mod interpreter_tests {
 
                 let reg_val = interpreter.v[x as usize];
 
-                // check to make sure the op worked as expected
-                assert_eq!(reg_val, rand_byte & eight_bits);
-
                 // check to make sure the op is changing (i.e. it's random)
-                if reg_val != rand_byte {
+                if reg_val != prev_byte {
                     // it changed
                     num_different = num_different + 1;
                 }
 
-                prev_byte = rand_byte;
+                prev_byte = reg_val;
             }
 
             assert!(num_different > 5);
@@ -1180,6 +1170,12 @@ mod interpreter_tests {
             let mut op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
+            // set x and y regs to arbitrary values
+            interpreter.v[x as usize] = 1;
+            interpreter.v[y as usize] = 2;
+
+            let x_reg = interpreter.v[x as usize];
+            let y_reg = interpreter.v[y as usize];
             // add arbitrary values starting at the memory address in I (which will be 0)
             // because these will be the values that get written to the graphics array
 
@@ -1206,7 +1202,7 @@ mod interpreter_tests {
 
             interpreter.execute(op);
 
-            let gfx_addr = Graphics::get_graphics_idx(x, y);
+            let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
             for i in 0..height as usize * 8 as usize {
                 assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
             }
@@ -1222,6 +1218,13 @@ mod interpreter_tests {
             let mut op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
+            // set x and y regs to arbitrary values
+            interpreter.v[x as usize] = 1;
+            interpreter.v[y as usize] = 2;
+
+            let x_reg = interpreter.v[x as usize];
+            let y_reg = interpreter.v[y as usize];
+
             // add arbitrary values starting at the memory address in I (which will be 0)
             // because these will be the values that get written to the graphics array
 
@@ -1234,7 +1237,7 @@ mod interpreter_tests {
             interpreter.memory[starting_addr] = arb_byte;
 
             // store the same bits we're setting in the op so we won't set reg VF to 1
-            let gfx_addr = Graphics::get_graphics_idx(x, y);
+            let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
 
             for j in 0..8 {
                 let bit = ((arb_byte >> (7 - j)) & 1) == 1;
@@ -1379,7 +1382,7 @@ mod interpreter_tests {
             assert_eq!(interpreter.pc, 2);
 
             // fake key presses so we can verify program state resumes after we press some keys
-            interpreter.handle_input_inner(Some(vec!(Key::Key1)));
+            interpreter.handle_key_input_inner(Some(vec!(Key::Key1)));
 
             interpreter.cycle();
 
