@@ -60,12 +60,12 @@ struct FX0AMetadata {
 }
 
 pub struct Interpreter {
-    pub memory: [u8; 4096], // 4k of RAM
+    memory: [u8; 4096], // 4k of RAM
 
     sp: usize, // stack pointer, 16 bits are needed but we use usize so we can index with it.
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
-    pub addr: u16, // address instruction register
+    addr: u16, // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize,     // program counter, 16 bits are needed but we use usize so we can index with it
 
@@ -511,6 +511,8 @@ impl Interpreter {
             self.prev_op = Some(op);
             self.pc = self.pc + 2;
 
+            self.decrement_timers();
+
             debug!(self.logger, "state after cycle: (sp: {}, addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
             self.sp, self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
@@ -553,6 +555,16 @@ impl Interpreter {
         self.memory[game_file_range].copy_from_slice(&buf);
 
         Ok(())
+    }
+
+    /// Subtract the delay and sound timers until they reach 0, at which point stop subtracting
+    fn decrement_timers(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer-=1;
+        }
+        if self.sound_timer > 0 {
+            self.sound_timer-=1;
+        }
     }
 }
 
@@ -1593,6 +1605,36 @@ pub mod interpreter_tests {
                     assert_eq!(interpreter.v[i as usize], 0);
                 }
             }
+        }
+
+        #[test]
+        fn delay_timer_dec() {
+            let mut interpreter = Interpreter::new(None);
+
+            let instr: usize = 0xFA65;
+            let op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            // fake setting timers to non-zero value
+            interpreter.delay_timer = 2;
+            interpreter.sound_timer = 4;
+
+            interpreter.decrement_timers();
+
+            assert_eq!(interpreter.delay_timer, 1);
+            assert_eq!(interpreter.sound_timer, 3);
+
+            interpreter.decrement_timers();
+            interpreter.decrement_timers();
+
+            assert_eq!(interpreter.delay_timer, 0);
+            assert_eq!(interpreter.sound_timer, 1);
+
+            interpreter.decrement_timers();
+            interpreter.decrement_timers();
+
+            assert_eq!(interpreter.delay_timer, 0);
+            assert_eq!(interpreter.sound_timer, 0);
         }
     }
 
