@@ -386,9 +386,13 @@ impl Interpreter {
                 for i in 0..x + 1 {
                     self.memory[self.addr as usize + i as usize] = self.v[i as usize];
                 }
+            },
+            Op::RegLoad(x) => {
+                for i in 0..x + 1 {
+                    self.v[i as usize] = self.memory[self.addr as usize + i as usize];
+                }
             }
-
-            _ => unimplemented!(),
+            _ => panic!("unknown opcode: {:?}", op),
         }
     }
 
@@ -1479,7 +1483,7 @@ mod interpreter_tests {
 
             interpreter.execute(op);
 
-            interpreter.addr = STARTING_MEMORY_BYTE as u16;
+            assert_eq!(interpreter.addr, STARTING_MEMORY_BYTE as u16);
             for i in 0u8..16u8 {
                 if (i <= x) {
                     // these should have been set from the register values
@@ -1491,6 +1495,38 @@ mod interpreter_tests {
             }
         }
 
+        #[test]
+        fn reg_load_op() {
+            let mut interpreter = Interpreter::new();
+
+            let instr: usize = 0xFA65;
+            let mut op = Op::from(instr as u16);
+            let (x, _, _) = usize_to_three_nibbles(instr);
+
+            // fake putting values in memory so our op will put them in the x
+            // bytes starting at memory location interpreter.addr
+            interpreter.addr = STARTING_MEMORY_BYTE as u16;
+            for i in 0..16 {
+                interpreter.memory[(interpreter.addr + i) as usize] = i as u8;
+            }
+
+            for i in 0..x + 1 {
+                assert_eq!(interpreter.v[i as usize], 0);
+            }
+
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.addr, STARTING_MEMORY_BYTE as u16);
+            for i in 0u8..16u8 {
+                if (i <= x) {
+                    // these should have been set from the memory values
+                    assert_eq!(interpreter.v[i as usize], i);
+                } else {
+                    // these should not have changed
+                    assert_eq!(interpreter.v[i as usize], 0);
+                }
+            }
+        }
     }
 
     #[test]
