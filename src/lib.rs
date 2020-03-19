@@ -82,11 +82,14 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new<L : Into<Option<slog::Logger>>>(logger: L) -> Self {
-        let mut builder = TerminalLoggerBuilder::new();
-        builder.level(Severity::Debug);
-        builder.destination(Destination::Stderr);
 
-        let logger = builder.build().unwrap();
+        //let logger = builder.build().unwrap();
+        let log = logger.into().unwrap_or({
+            let mut builder = TerminalLoggerBuilder::new();
+            builder.level(Severity::Debug);
+            builder.destination(Destination::Stderr);
+            builder.build().unwrap()
+        });
         let mut interpreter = Interpreter {
             memory: [0; 4096],
             sp: 0,
@@ -102,7 +105,7 @@ impl Interpreter {
                 last_key_pressed: None,
                 register: None,
             },
-            logger: logger,
+            logger: log,
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter
@@ -619,7 +622,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn display_clear_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
             assert_eq!(interpreter.v[0xf], 0);
 
             let instr = 0x00E0;
@@ -634,13 +637,13 @@ pub mod interpreter_tests {
             interpreter.execute(op);
 
             for i in 0..interpreter.graphics.len() {
-                assert_eq!(interpreter.graphics[i], false);
+                assert_eq!(interpreter.graphics[i], 0);
             }
         }
 
         #[test]
         fn return_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             assert_eq!(interpreter.sp, 0);
             assert_eq!(interpreter.pc, 0);
@@ -670,7 +673,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn goto_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
             assert_eq!(interpreter.pc, 0);
 
             let instr: usize = 0x1FAB;
@@ -684,7 +687,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn call_subroutine_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
             assert_eq!(interpreter.pc, 0);
             assert_eq!(interpreter.sp, 0);
 
@@ -706,7 +709,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_eq_op_false() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -724,7 +727,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_eq_op_true() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -742,7 +745,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_ne_op_false() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -760,7 +763,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_ne_op_true() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -778,7 +781,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_vy_eq_op_false() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -800,7 +803,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_vy_eq_op_true() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             // setup test
 
@@ -820,7 +823,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn const_vx_set_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x6AFB;
             let op = Op::from(instr as u16);
@@ -837,7 +840,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn const_vx_plus_set_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x7AFB;
             let op = Op::from(instr as u16);
@@ -856,7 +859,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn assign_vx_vy_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB0;
             let op = Op::from(instr as u16);
@@ -875,7 +878,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bit_or_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB1;
             let op = Op::from(instr as u16);
@@ -894,7 +897,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bit_and_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB2;
             let op = Op::from(instr as u16);
@@ -911,7 +914,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bit_xor_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB3;
             let op = Op::from(instr as u16);
@@ -928,7 +931,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_add_vy_no_carry() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB4;
             let op = Op::from(instr as u16);
@@ -946,7 +949,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_add_vy_with_carry() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB4;
             let op = Op::from(instr as u16);
@@ -964,7 +967,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_minus_vy_no_borrow() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB5;
             let op = Op::from(instr as u16);
@@ -982,7 +985,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_minus_vy_with_borrow() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB5;
             let op = Op::from(instr as u16);
@@ -1000,7 +1003,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bit_right_shift_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB6;
             let op = Op::from(instr as u16);
@@ -1022,7 +1025,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bit_left_shift_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8ABE;
             let op = Op::from(instr as u16);
@@ -1044,7 +1047,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_eq_vy_minus_vx_no_borrow() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB7;
             let op = Op::from(instr as u16);
@@ -1062,7 +1065,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn math_vx_eq_vy_minus_vx_borrow() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x8AB7;
             let op = Op::from(instr as u16);
@@ -1080,7 +1083,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_ne_vy_op_not_equal() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x9AB0;
             let op = Op::from(instr as u16);
@@ -1098,7 +1101,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn cond_vx_ne_vy_op_equal() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0x9AB0;
             let op = Op::from(instr as u16);
@@ -1116,7 +1119,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn mem_set_i_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xA012;
             let op = Op::from(instr as u16);
@@ -1132,7 +1135,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn goto_plus_v0_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xB012;
             let op = Op::from(instr as u16);
@@ -1150,7 +1153,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn random_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xC012;
             let op = Op::from(instr as u16);
@@ -1186,7 +1189,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn display_op_collision() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xD012;
             let op = Op::from(instr as u16);
@@ -1206,20 +1209,22 @@ pub mod interpreter_tests {
 
             let mut sprite = Vec::with_capacity((height * 8) as usize);
             for i in 0 as usize..height as usize {
-                // 8 bits in a byte
-
+                // we use a random byte so that this test covers more possible cases
                 let random_byte: u8 = thread_rng().gen();
 
                 // store the bits of the sprite
                 for j in 0..8 {
-                    let bit = ((random_byte >> (7 - j)) & 1) == 1;
+                    let mut bit = 0;
+                    if ((random_byte >> (7 - j)) & 1) == 1 {
+                        bit = 0xFFFFFF;
+                    }
                     sprite.push(bit);
                 }
                 interpreter.memory[(starting_addr + i) as usize] = random_byte;
             }
 
             for i in 0..interpreter.graphics.len() {
-                assert_eq!(interpreter.graphics[i], false);
+                assert_eq!(interpreter.graphics[i], 0);
             }
 
             interpreter.execute(op);
@@ -1229,12 +1234,31 @@ pub mod interpreter_tests {
                 assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
             }
 
+            // VF register should not have been set, because we only set VF when a pixel goes from
+            // 1 -> 0, and in this case they all started out at 1.
+            assert_eq!(interpreter.v[0xf], 0);
+
+            // now let's set them all to 0, and see that VF gets set to 1. NOTE. In the extremely
+            // unlikely chance that the random bytes were all 0 and we don't end up flipping any bits
+            // here, count yourself one of the luckiest human alive
+
+            // first set all bits for the pixels we'll use to 0
+            for i in 0 as usize..height as usize {
+                interpreter.memory[(starting_addr + i) as usize] = 0;
+            }
+
+            interpreter.execute(op);
+
             assert_eq!(interpreter.v[0xf], 1);
+
+            for i in 0..interpreter.graphics.len() {
+                assert_eq!(interpreter.graphics[i], 0);
+            }
         }
 
         #[test]
         fn display_op_no_collision() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xD011; // height is 1, so only 8 bits
             let op = Op::from(instr as u16);
@@ -1262,9 +1286,12 @@ pub mod interpreter_tests {
             let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
 
             for j in 0..8 {
-                let bit = ((arb_byte >> (7 - j)) & 1) == 1;
+                let mut bit = 0;
+                if ((arb_byte >> (7 - j)) & 1) == 1 {
+                    bit = 0xFFFFFF;
+                }
                 sprite.push(bit);
-                interpreter.graphics.set(gfx_addr + j as usize, bit);
+                interpreter.graphics.set(gfx_addr + j as usize, bit != 0);
             }
 
             interpreter.execute(op);
@@ -1278,7 +1305,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn key_eq_vx_op_keyup() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xE09E;
             let op = Op::from(instr as u16);
@@ -1298,7 +1325,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn key_eq_vx_op_keydown() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xE09E;
             let op = Op::from(instr as u16);
@@ -1319,7 +1346,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn key_ne_vx_op_keyup() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xE0A1;
             let op = Op::from(instr as u16);
@@ -1336,7 +1363,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn key_ne_vx_op_keydown() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xE0A1;
             let op = Op::from(instr as u16);
@@ -1357,7 +1384,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn delay_timer_set_vx_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xF007;
             let op = Op::from(instr as u16);
@@ -1376,7 +1403,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn key_get_block_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr = 0xF00A;
             let (x, _, _) = usize_to_three_nibbles(instr);
@@ -1417,7 +1444,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn mem_set_add_vx_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xF01E;
             let op = Op::from(instr as u16);
@@ -1446,7 +1473,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn mem_set_sprite_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xF129;
             let op = Op::from(instr as u16);
@@ -1473,7 +1500,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn bcd_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xF133;
             let op = Op::from(instr as u16);
@@ -1492,7 +1519,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn reg_dump_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xFA55;
             let op = Op::from(instr as u16);
@@ -1525,7 +1552,7 @@ pub mod interpreter_tests {
 
         #[test]
         fn reg_load_op() {
-            let mut interpreter = Interpreter::new();
+            let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xFA65;
             let op = Op::from(instr as u16);
