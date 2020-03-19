@@ -7,7 +7,7 @@ use rand::{thread_rng, Rng};
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use slog::info;
+use slog::{debug, info};
 use sloggers::Build;
 use sloggers::terminal::{TerminalLoggerBuilder, Destination};
 use sloggers::types::Severity;
@@ -86,9 +86,12 @@ impl Interpreter {
         //let logger = builder.build().unwrap();
         let log = logger.into().unwrap_or({
             let mut builder = TerminalLoggerBuilder::new();
-            builder.level(Severity::Debug);
+            builder.level(Severity::Info);
             builder.destination(Destination::Stderr);
-            builder.build().unwrap()
+            let built_log = builder.build().unwrap();
+
+            debug!(built_log, "no logger given, defaulting to slog's terminal logger");
+            built_log
         });
         let mut interpreter = Interpreter {
             memory: [0; 4096],
@@ -144,6 +147,7 @@ impl Interpreter {
 
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
+        debug!(self.logger, "executing op: {:?}", op);
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
@@ -431,6 +435,7 @@ impl Interpreter {
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
+        debug!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
@@ -505,6 +510,9 @@ impl Interpreter {
             // advance to the next instruction
             self.prev_op = Some(op);
             self.pc = self.pc + 2;
+
+            debug!(self.logger, "state after cycle: (sp: {}, addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+            self.sp, self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
 
         op
@@ -522,10 +530,14 @@ impl Interpreter {
     /// Read in a game file and initialize the necessary registers.
     ///
     /// Returns an error if we fail to open the game file
-    pub fn initialize(&mut self, file: File) -> Result<(), Error> {
-        self.read_game_file(file)?;
+    pub fn initialize(&mut self, path: &str) -> Result<(), Error> {
+        let game_file = File::open(path).unwrap();
+
+        self.read_game_file(game_file)?;
         self.sp = STACK_START;
         self.pc = STARTING_MEMORY_BYTE;
+
+        debug!(self.logger, "initialized interpreter with game file: {}", path);
 
         Ok(())
     }

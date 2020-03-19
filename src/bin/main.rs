@@ -1,7 +1,6 @@
 use std::io::Error;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 use chipotle8::Interpreter;
-use std::fs::File;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
@@ -23,8 +22,7 @@ fn main() -> Result<(), Error> {
     window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     let mut interpreter = crate::Interpreter::new(None);
-    let game_file = File::open("pong.ch8").unwrap();
-    interpreter.initialize(game_file);
+    interpreter.initialize("pong.ch8");
 
     interpreter.draw(&mut window);
 

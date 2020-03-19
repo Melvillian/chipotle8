@@ -84,7 +84,7 @@ impl From<u16> for Op {
         let nibb_4 = (item & mask) as u8;
         let nibbles = [nibb_1, nibb_2, nibb_3, nibb_4];
 
-        let panic_msg = format!("unknown u16 {}", item);
+        let panic_msg = format!("unknown u16: {}", item);
 
         match nibbles {
             [0x0, n2, n3, n4] => match n4 {
