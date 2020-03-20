@@ -2,12 +2,12 @@ use std::io::Error;
 use minifb::{Key, ScaleMode, Window, WindowOptions};
 use chipotle8::Interpreter;
 use std::thread;
-use std::time;
 use sloggers::terminal::TerminalLoggerBuilder;
 use sloggers::types::Severity;
 use sloggers::Build;
 use sloggers::terminal::Destination;
 use slog::{debug, info};
+use std::time::{Duration, Instant};
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
@@ -26,32 +26,25 @@ fn main() -> Result<(), Error> {
         .expect("Unable to create window");
 
     // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    window.limit_update_rate(Some(Duration::from_micros(16600)));
 
     let mut interpreter = crate::Interpreter::new(None);
 
     interpreter.initialize("pong.ch8");
 
-    let mut cnt = 0;
+    let mut earlier = Instant::now();
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        cnt+=1;
-        info!(interpreter.get_logger(), "{}", cnt);
-//        if (window.is_key_down(Key::Enter)) {
-//            println!("HOLY FUCK");
-//        }
-//        window.get_keys().map(|keys| {
-//            for t in keys {
-//                println!("holding: {:?}", t);
-//            }
-//        });
+        let now = Instant::now();
+        if Instant::now().duration_since(earlier).as_micros() > 16000 { // update at 60 Hz
+            earlier = now;
 
-        interpreter.cycle();
-        interpreter.handle_key_input(&window);
-        interpreter.draw(&mut window);
-
-//        let ten_millis = time::Duration::from_millis(100);
-//
-//        thread::sleep(ten_millis);
+            for _ in 0..10 { // 600 cycles per second
+                interpreter.cycle();
+                interpreter.handle_key_input(&window);
+                interpreter.draw(&mut window);
+            }
+        }
     }
     Ok(())
 }

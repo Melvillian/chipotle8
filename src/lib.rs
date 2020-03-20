@@ -619,7 +619,8 @@ fn usize_to_two_nibbles(u: usize) -> (u8, u8) {
 /// to convert three 4-bit pieces of data in memory into a single 16-bit
 /// instruction.
 fn three_nibbles_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
-    ((msb as u16) << 8) | ((b as u16) << 4) | (lsb as u16)
+    let mask = 0xF;
+    ((msb as u16 & mask) << 8) | ((b as u16 & mask) << 4) | (lsb as u16 & mask)
 }
 
 fn three_nibbles_to_usize(msb: u8, b: u8, lsb: u8) -> usize {

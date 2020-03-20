@@ -96,7 +96,7 @@ impl From<u16> for Op {
             [0x2, n2, n3, n4] => Op::GotoSubRtn(n2, n3, n4),
             [0x3, n2, n3, n4] => Op::CondVxEq(n2, n3, n4),
             [0x4, n2, n3, n4] => Op::CondVxNe(n2, n3, n4),
-            [0x5, n2, n3, _] => Op::CondVxVyEq(n2, n3),
+            [0x5, n2, n3, 0x0] => Op::CondVxVyEq(n2, n3),
             [0x6, n2, n3, n4] => Op::ConstSetVx(n2, n3, n4),
             [0x7, n2, n3, n4] => Op::ConstAddVx(n2, n3, n4),
             [0x8, n2, n3, n4] => match n4 {
