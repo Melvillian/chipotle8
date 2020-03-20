@@ -15,11 +15,9 @@ use slog::Logger;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
-const CALL_STACK_SIZE: usize = 96;
 const STARTING_MEMORY_BYTE: usize = 512;
 const GAME_FILE_MEMORY_SIZE: usize =
-    MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE + STARTING_MEMORY_BYTE);
-const STACK_START: usize = MEMORY_SIZE - DISPLAY_REFRESH_SIZE + CALL_STACK_SIZE;
+    MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 
@@ -62,9 +60,10 @@ struct FX0AMetadata {
 pub struct Interpreter {
     memory: [u8; 4096], // 4k of RAM
 
-    sp: usize, // stack pointer, 16 bits are needed but we use usize so we can index with it.
+    sp: usize, // stack pointer for the 16-level
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
+    stack: [usize; 16], // 16-level stack holding instructions
     addr: u16, // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize,     // program counter, 16 bits are needed but we use usize so we can index with it
@@ -95,6 +94,7 @@ impl Interpreter {
         let mut interpreter = Interpreter {
             memory: [0; 4096],
             sp: 0,
+            stack: [0; 16],
             addr: 0,
             prev_op: None,
             pc: 0,
@@ -159,15 +159,11 @@ impl Interpreter {
                 }
             }
             Op::Return => {
-                self.sp = self.sp - 1;
-                let lsb = self.memory[self.sp];
-                self.memory[self.sp] = 0; // zero out stack
+                self.sp-=1;
+                self.pc = self.stack[self.sp];
 
-                self.sp = self.sp - 1;
-                let msb = self.memory[self.sp];
-                self.memory[self.sp] = 0; // zero out stack
-
-                self.pc = two_u8s_to_u16(msb, lsb) as usize;
+                // zero out the stack for good measure
+                self.stack[self.sp] = 0;
             }
             Op::Goto(msb, b, lsb) => {
                 let instr = three_nibbles_to_usize(msb, b, lsb);
@@ -175,10 +171,7 @@ impl Interpreter {
             }
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
-                let (pc_msb, pc_lsb) = u16_to_two_u8s(self.pc as u16);
-                self.memory[self.sp] = pc_msb;
-                self.sp+=1;
-                self.memory[self.sp] = pc_lsb;
+                self.stack[self.sp] = self.pc;
                 self.sp+=1;
 
                 // jump to the subroutine
@@ -516,7 +509,7 @@ impl Interpreter {
         let op = self.get_instr_at_pc();
         if !self.fx0a_metadata.should_block_on_keypress {
             info!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
-              self.sp, self.memory[STACK_START..STACK_START+8].to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+              self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
 
                   self.execute(op);
 
@@ -527,7 +520,7 @@ impl Interpreter {
             self.decrement_timers();
 
             info!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
-                  self.sp, self.memory[STACK_START..STACK_START+8].to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+                  self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
 
         op
@@ -549,7 +542,7 @@ impl Interpreter {
         let game_file = File::open(path).unwrap();
 
         self.read_game_file(game_file)?;
-        self.sp = STACK_START;
+        self.sp = 0;
         self.pc = STARTING_MEMORY_BYTE;
 
         debug!(self.logger, "initialized interpreter with game file: {}", path);
@@ -693,15 +686,10 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, 0);
 
             // fake call a function so we set a return address on the stack. We use arbitrary return
-            // address 0x01AA
+            // address 0x001A
             let arb_addr = 0x001A;
-            let (msb, lsb) = u16_to_two_u8s(arb_addr);
-            interpreter.memory[interpreter.sp] = msb;
+            interpreter.stack[interpreter.sp] = arb_addr;
             interpreter.sp+=1;
-
-            interpreter.memory[interpreter.sp] = lsb;
-            interpreter.sp+=1;
-
             interpreter.pc = 0x090B; // arbitrary position for the program counter
 
             let instr = 0x00EE;
@@ -711,8 +699,7 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, arb_addr as usize);
             assert_eq!(interpreter.sp, 0);
 
-            assert_eq!(interpreter.memory[interpreter.sp], 0);
-            assert_eq!(interpreter.memory[interpreter.sp + 1], 0);
+            assert_eq!(interpreter.stack[interpreter.sp], 0);
         }
 
         #[test]
@@ -745,10 +732,8 @@ pub mod interpreter_tests {
             interpreter.execute(Op::from(instr as u16));
 
             assert_eq!(interpreter.pc, addr);
-            assert_eq!(interpreter.sp, 2);
-            let (msb, lsb) = u16_to_two_u8s(arb_addr as u16);
-            assert_eq!(interpreter.memory[interpreter.sp - 1], lsb);
-            assert_eq!(interpreter.memory[interpreter.sp - 2], msb);
+            assert_eq!(interpreter.sp, 1);
+            assert_eq!(interpreter.stack[interpreter.sp - 1], arb_addr);
         }
 
         #[test]

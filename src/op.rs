@@ -165,7 +165,7 @@ mod tests {
         op_num = 0x4FAA;
         assert_eq!(Op::from(op_num), Op::CondVxNe(0xF, 0xA, 0xA));
 
-        op_num = 0x5FAB;
+        op_num = 0x5FA0;
         assert_eq!(Op::from(op_num), Op::CondVxVyEq(0xF, 0xA));
 
         op_num = 0x6FAB;
