@@ -311,17 +311,17 @@ impl Interpreter {
             }
             Op::KeyOpEqVx(x) => {
                 let x_reg = self.v[x as usize];
-                let key_state = self.graphics.get_key_state(x_reg as usize);
+                let is_pressed = self.graphics.get_key_state(x_reg as usize);
 
-                if key_state {
+                if is_pressed {
                     self.skip_instruction();
                 }
             }
             Op::KeyOpNeVx(x) => {
                 let x_reg = self.v[x as usize];
-                let key_state = self.graphics.get_key_state(x_reg as usize);
+                let is_pressed = self.graphics.get_key_state(x_reg as usize);
 
-                if !key_state {
+                if !is_pressed {
                     self.skip_instruction();
                 }
             }
@@ -357,16 +357,20 @@ impl Interpreter {
             }
             Op::Bcd(x) => {
                 let reg = self.v[x as usize];
-                let ascii_offset = 48;
+                let ascii_offset = 48; // we need to subtract 48 because the ascii byte for
+                // "1" is 49, for "2" is 50, ... for "9" is 57
 
                 let decimal_repr = format!("{:03}", reg);
                 let addr_usize = self.addr as usize;
-                self.memory[addr_usize + 0 as usize] = decimal_repr.get(0..1)
-                    .unwrap().as_bytes()[0] - ascii_offset;
-                self.memory[addr_usize + 1 as usize] = decimal_repr.get(1..2)
-                    .unwrap().as_bytes()[0] - ascii_offset;
-                self.memory[addr_usize + 2 as usize] = decimal_repr.get(2..3)
-                    .unwrap().as_bytes()[0] - ascii_offset;
+
+                let hundreds_place = decimal_repr.get(0..1).unwrap().as_bytes()[0] - ascii_offset;
+                self.memory[addr_usize + 0 as usize] = hundreds_place;
+
+                let tens_place = decimal_repr.get(1..2).unwrap().as_bytes()[0] - ascii_offset;
+                self.memory[addr_usize + 1 as usize] = tens_place;
+
+                let ones_place = decimal_repr.get(2..3).unwrap().as_bytes()[0] - ascii_offset;
+                self.memory[addr_usize + 2 as usize] = ones_place;
             },
             Op::RegDump(x) => {
                 for i in 0..x + 1 {
@@ -715,10 +719,6 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, 0);
             assert_eq!(interpreter.sp, 0);
 
-            // fake the interpreter in the middle of execution by setting pc to arbitrary address
-            let arb_addr = 0x0FAB;
-            interpreter.pc = arb_addr;
-
             let instr = 0x2DEF;
             let (msb, b, lsb) = usize_to_three_nibbles(instr);
             let addr = three_nibbles_to_usize(msb, b, lsb);
@@ -726,7 +726,7 @@ pub mod interpreter_tests {
 
             assert_eq!(interpreter.pc, addr);
             assert_eq!(interpreter.sp, 1);
-            assert_eq!(interpreter.stack[interpreter.sp - 1], arb_addr);
+            assert_eq!(interpreter.stack[interpreter.sp - 1], 2);
         }
 
         #[test]
