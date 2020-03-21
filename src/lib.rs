@@ -312,8 +312,8 @@ impl Interpreter {
                     for col_delta in 0..8 {
                         let is_black = ((byte >> (7 - col_delta)) & 1) == 1;
 
-                        let x_coord = (x_reg + col_delta) % graphics::WIDTH as u8;
-                        let y_coord = (y_reg + row_delta) % graphics::HEIGHT as u8;
+                        let x_coord = x_reg + col_delta;
+                        let y_coord = y_reg + row_delta;
                         let gfx_idx = Graphics::get_graphics_idx(x_coord, y_coord);
 
                         let is_collision = self.graphics.xor_set(gfx_idx, is_black);
@@ -1246,8 +1246,8 @@ pub mod interpreter_tests {
 
             for i in 0..height {
                 for j in 0..8 {
-                    let x_coord = (x_reg + j) % graphics::WIDTH as u8;
-                    let y_coord = (y_reg + i) % graphics::HEIGHT as u8;
+                    let x_coord = x_reg + j;
+                    let y_coord = y_reg + i;
                     let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     let mut pixel = 0;
@@ -1280,8 +1280,8 @@ pub mod interpreter_tests {
             let new_byte = 0b01010101;
             for i in 0..height {
                 for j in 0..8 {
-                    let x_coord = (x_reg + j) % graphics::WIDTH as u8;
-                    let y_coord = (y_reg + i) % graphics::WIDTH as u8;
+                    let x_coord = x_reg + j;
+                    let y_coord = y_reg + i;
                     let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     let mut pixel = 0;
