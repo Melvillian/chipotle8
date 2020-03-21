@@ -733,8 +733,6 @@ pub mod interpreter_tests {
         fn cond_vx_eq_op_false() {
             let mut interpreter = Interpreter::new(None);
 
-            // setup test
-
             let instr = 0x3AAB;
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
@@ -750,8 +748,6 @@ pub mod interpreter_tests {
         #[test]
         fn cond_vx_eq_op_true() {
             let mut interpreter = Interpreter::new(None);
-
-            // setup test
 
             let instr = 0x3A00;
             let op = Op::from(instr as u16);
@@ -769,8 +765,6 @@ pub mod interpreter_tests {
         fn cond_vx_ne_op_false() {
             let mut interpreter = Interpreter::new(None);
 
-            // setup test
-
             let instr = 0x4A00;
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
@@ -786,8 +780,6 @@ pub mod interpreter_tests {
         #[test]
         fn cond_vx_ne_op_true() {
             let mut interpreter = Interpreter::new(None);
-
-            // setup test
 
             let instr = 0x4AFB;
             let op = Op::from(instr as u16);
@@ -805,14 +797,12 @@ pub mod interpreter_tests {
         fn cond_vx_vy_eq_op_false() {
             let mut interpreter = Interpreter::new(None);
 
-            // setup test
-
             let nibbles = 0x5AF0; // arbitrary 3 nibbles
             let op = Op::from(nibbles as u16);
             let (x, y, _) = usize_to_three_nibbles(nibbles);
             let x_usize = x as usize;
             let y_usize = y as usize;
-            interpreter.pc = STARTING_MEMORY_BYTE;
+
             let arb_byte = 0xAB;
 
             interpreter.v[x_usize] = arb_byte;
@@ -820,27 +810,24 @@ pub mod interpreter_tests {
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE);
+            assert_eq!(interpreter.pc, 0);
         }
 
         #[test]
         fn cond_vx_vy_eq_op_true() {
             let mut interpreter = Interpreter::new(None);
 
-            // setup test
-
             let nibbles = 0x5AF0; // arbitrary 3 nibbles
             let op = Op::from(nibbles as u16);
             let (x, y, _) = usize_to_three_nibbles(nibbles);
-            interpreter.pc = STARTING_MEMORY_BYTE;
-            let arb_byte = 0xAB;
 
+            let arb_byte = 0xAB;
             interpreter.v[x as usize] = arb_byte;
             interpreter.v[y as usize] = arb_byte;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.pc, STARTING_MEMORY_BYTE + 2);
+            assert_eq!(interpreter.pc, 2);
         }
 
         #[test]
@@ -869,7 +856,7 @@ pub mod interpreter_tests {
             let (x, msb, lsb) = usize_to_three_nibbles(instr);
             let x_usize = x as usize;
 
-            let offset = 1; // set vA to something other than 0 so we can make sure 0xFB gets added
+            let offset = 1; // set VA to something other than 0 so we can make sure 0xFB gets added
             interpreter.v[x_usize] = offset;
             assert_eq!(interpreter.v[x_usize], offset);
 
