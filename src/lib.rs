@@ -295,9 +295,8 @@ impl Interpreter {
 
                         let x_coord = x_reg + col_delta;
                         let y_coord = y_reg + row_delta;
-                        let gfx_idx = Graphics::get_graphics_idx(x_coord, y_coord);
 
-                        let is_collision = self.graphics.xor_set(gfx_idx, is_black);
+                        let is_collision = self.graphics.xor_set(x_coord, y_coord, is_black);
                         if is_collision {
                             should_set_vf = true;
                         }
@@ -645,11 +644,11 @@ pub mod interpreter_tests {
             let instr = 0x00E0;
             let op = Op::from(instr);
 
-            // set some graphics bits to true so we can later see the set to false;
-            interpreter.graphics.set(0, true);
+            // set some graphics bits to true so we can later see them set to false;
+            interpreter.graphics.set(0, 0, true);
             interpreter
                 .graphics
-                .set(interpreter.graphics.len() - 1, true);
+                .set((graphics::WIDTH - 1) as u8, (graphics::HEIGHT - 1) as u8, true);
 
             interpreter.execute(op);
 
@@ -1363,7 +1362,7 @@ pub mod interpreter_tests {
                         pixel = 0xFFFFFF;
                     }
                     let x_coord = x_reg + x_delta;
-                    let y_coord = y_reg + y_delta - 1;
+                    let y_coord = y_reg + y_delta;
                     let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     assert_eq!(interpreter.graphics[gfx_addr], pixel);

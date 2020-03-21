@@ -47,7 +47,9 @@ impl Graphics {
 
     /// Set the given pixel to black if enabled equals true, and to white otherwise
     #[inline]
-    pub fn set(&mut self, idx: usize, enabled: bool) {
+    #[cfg(test)]
+    pub fn set(&mut self, x: u8, y: u8, enabled: bool) {
+        let idx = Self::get_graphics_idx(x, y);
         if enabled {
             self.buffer[idx] = BLACK_RGB;
         } else {
@@ -58,7 +60,9 @@ impl Graphics {
     /// Set the given pixel at `idx` to the XOR of the current pixel at `idx` and black if `enable`
     /// equals true or white if `enable` equals false. Returns true if the pixel was unset
     #[inline]
-    pub fn xor_set(&mut self, idx: usize, enabled: bool) -> bool {
+    pub fn xor_set(&mut self, x: u8, y: u8, enabled: bool) -> bool {
+        let idx = Self::get_graphics_idx(x, y);
+
         let prev_pix = self.buffer[idx];
 
         if enabled {
