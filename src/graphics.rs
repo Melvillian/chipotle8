@@ -35,6 +35,7 @@ impl Graphics {
 
     /// Given x (column) and y (row) coordinates for a bit in the buffer, return the corresponding
     /// index of that bit in the buffer
+    #[inline]
     pub fn get_graphics_idx(x: u8, y: u8) -> usize {
         let column = x as usize;
         let row = (y * 8) as usize;
@@ -42,12 +43,28 @@ impl Graphics {
         column + row
     }
 
-    pub fn set(&mut self, bit: usize, enabled: bool) {
+    /// Set the given pixel to black if enabled equals true, and to white otherwise
+    #[inline]
+    pub fn set(&mut self, idx: usize, enabled: bool) {
         if enabled {
-            self.buffer[bit] = BLACK_RGB;
+            self.buffer[idx] = BLACK_RGB;
         } else {
-            self.buffer[bit] = WHITE_RGB;
+            self.buffer[idx] = WHITE_RGB;
         }
+    }
+
+    /// Set the given pixel at `idx` to the XOR of the current pixel at `idx` and black if `enable`
+    /// equals true or white if `enable` equals false. Returns true if the pixel was unset
+    #[inline]
+    pub fn xor_set(&mut self, idx: usize, enabled: bool) -> bool {
+        let prev_pix = self.buffer[idx];
+        if enabled {
+            self.buffer[idx]^=BLACK_RGB;
+        } else {
+            self.buffer[idx]^=WHITE_RGB;
+        }
+
+        prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
     }
 
     /// We use the following mapping for the 16 bit hex keyboard
@@ -83,8 +100,12 @@ impl Graphics {
         }
     }
 
-    pub fn is_collision(&self, idx: usize, new_pixel_is_black: bool) -> bool {
-        self[idx] == BLACK_RGB && !new_pixel_is_black
+    /// set all pixels to white (0)
+    #[inline]
+    pub fn clear(&mut self) {
+        for i in 0..self.buffer.len() {
+            self.buffer[i] = 0;
+        }
     }
 
     /// Handle the key down event for one of the 16 possible keys

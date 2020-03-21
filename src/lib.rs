@@ -154,9 +154,7 @@ impl Interpreter {
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
-                for i in 0..self.graphics.len() {
-                    self.graphics.set(i, false);
-                }
+                self.graphics.clear();
             }
             Op::Return => {
                 self.sp-=1;
@@ -207,11 +205,10 @@ impl Interpreter {
             }
             Op::ConstAddVx(x, msb, lsb) => {
                 let byte = two_nibbles_to_u8(msb, lsb);
-                self.v[x as usize] = self.v[x as usize] + byte;
+                self.v[x as usize]+=byte;
             }
             Op::AssignVyToVx(x, y) => {
-                let y_reg = self.v[y as usize];
-                self.v[x as usize] = y_reg;
+                self.v[x as usize] = self.v[y as usize];
             }
             Op::BitOpOr(x, y) => {
                 let x_reg = self.v[x as usize];
@@ -247,10 +244,10 @@ impl Interpreter {
                 let y_reg = self.v[y as usize];
 
                 // check for borrow
-                let (val, did_overflow) = x_reg.overflowing_sub(y_reg);
-                self.v[x as usize] = val;
+                let (sum, did_borrow) = x_reg.overflowing_sub(y_reg);
+                self.v[x as usize] = sum;
 
-                if did_overflow {
+                if did_borrow {
                     self.v[0xf] = 0;
                 } else {
                     self.v[0xf] = 1;
@@ -259,17 +256,17 @@ impl Interpreter {
             Op::BitOpRtShift(x) => {
                 let x_reg = self.v[x as usize];
 
-                self.v[0xf] = x_reg & 0b1; // set VF to the value of the lsb
-                self.v[x as usize] = self.v[x as usize] >> 1;
+                self.v[0xf] = x_reg & 1; // set VF to the value of the least significant bit
+                self.v[x as usize]>>=1;
             }
             Op::MathVyMinusVx(x, y) => {
                 let x_reg = self.v[x as usize];
                 let y_reg = self.v[y as usize];
 
-                let (val, did_overflow) = y_reg.overflowing_sub(x_reg);
-                self.v[x as usize] = val;
+                let (sum, did_borrow) = y_reg.overflowing_sub(x_reg);
+                self.v[x as usize] = sum;
 
-                if did_overflow {
+                if did_borrow {
                     self.v[0xf] = 0;
                 } else {
                     self.v[0xf] = 1;
@@ -278,8 +275,8 @@ impl Interpreter {
             Op::BitOpLftShift(x) => {
                 let x_reg = self.v[x as usize];
 
-                self.v[0xf] = (x_reg & 0b10000000) >> 7; // set VF to the value of the msb
-                self.v[x as usize] = self.v[x as usize] << 1;
+                self.v[0xf] = ((x_reg & 0b10000000) >> 7) & 1; // set VF to the value of the most sig bit
+                self.v[x as usize]<<=1;
             }
             Op::CondVxVyNe(x, y) => {
                 let x_reg = self.v[x as usize];
@@ -295,9 +292,9 @@ impl Interpreter {
             }
             Op::GotoPlusV0(msb, b, lsb) => {
                 let addr = three_nibbles_to_u16(msb, b, lsb);
-                let v0 = self.v[0];
+                let v0_reg = self.v[0];
 
-                self.pc = addr as usize + v0 as usize;
+                self.pc = addr as usize + v0_reg as usize;
             }
             Op::Rand(x, msb, lsb) => {
                 let random_byte: u8 = thread_rng().gen();
@@ -306,8 +303,8 @@ impl Interpreter {
                 self.v[x as usize] = random_byte & eight_bits;
             }
             Op::DispDraw(x, y, height) => {
-                let x_coord = self.v[x as usize];
-                let y_coord = self.v[y as usize];
+                let x_coord = self.v[x as usize] % graphics::WIDTH as u8;
+                let y_coord = self.v[y as usize] % graphics::HEIGHT as u8;
 
                 let gfx_start_idx = Graphics::get_graphics_idx(x_coord, y_coord);
 
@@ -319,13 +316,12 @@ impl Interpreter {
                         let is_black = ((byte >> (7 - j)) & 1) == 1;
 
                         let gfx_offset = row + j;
+                        let gfx_idx = (gfx_start_idx + gfx_offset) % self.graphics.len();
 
-                        let is_different = should_set_vf != true
-                            && self.graphics.is_collision(gfx_start_idx + gfx_offset, is_black);
-                        if is_different {
+                        let is_collision = self.graphics.xor_set(gfx_idx, is_black);
+                        if is_collision {
                             should_set_vf = true;
                         }
-                        self.graphics.set(gfx_start_idx + gfx_offset, is_black);
                     }
                 }
 
@@ -476,8 +472,9 @@ impl Interpreter {
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
     /// by some conditional opcodes
+    #[inline]
     fn skip_instruction(&mut self) {
-        self.pc = self.pc + 2;
+        self.pc+=2;
     }
 
     /// Draw the 64x32 pixel map
@@ -1195,7 +1192,7 @@ pub mod interpreter_tests {
 
             // I don't want to bother setting up tests for randomness on this op, so because I'm
             // lazy I'm going to run the op 10 times and makes sure at least 5 of those times it
-            // changes to reg's value to a different number. This test will produce a false negative
+            // changes the reg's value to a different number. This test will produce a false negative
             // very infrequently, which I can live with.
 
             let mut num_different = 0;
@@ -1207,7 +1204,7 @@ pub mod interpreter_tests {
                 // check to make sure the op is changing (i.e. it's random)
                 if reg_val != prev_byte {
                     // it changed
-                    num_different = num_different + 1;
+                    num_different+=1;
                 }
 
                 prev_byte = reg_val;
@@ -1243,11 +1240,11 @@ pub mod interpreter_tests {
 
                 // store the bits of the sprite
                 for j in 0..8 {
-                    let mut bit = 0;
+                    let mut pixel = 0;
                     if ((random_byte >> (7 - j)) & 1) == 1 {
-                        bit = 0xFFFFFF;
+                        pixel = 0xFFFFFF;
                     }
-                    sprite.push(bit);
+                    sprite.push(pixel);
                 }
                 interpreter.memory[(starting_addr + i) as usize] = random_byte;
             }
@@ -1269,7 +1266,7 @@ pub mod interpreter_tests {
 
             // now let's set them all to 0, and see that VF gets set to 1. NOTE. In the extremely
             // unlikely chance that the random bytes were all 0 and we don't end up flipping any bits
-            // here, count yourself one of the luckiest human alive
+            // here, count yourself one of the luckiest humans alive
 
             // first set all bits for the pixels we'll use to 0
             for i in 0 as usize..height as usize {
@@ -1315,12 +1312,12 @@ pub mod interpreter_tests {
             let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
 
             for j in 0..8 {
-                let mut bit = 0;
+                let mut pixel = 0;
                 if ((arb_byte >> (7 - j)) & 1) == 1 {
-                    bit = 0xFFFFFF;
+                    pixel = 0xFFFFFF;
                 }
-                sprite.push(bit);
-                interpreter.graphics.set(gfx_addr + j as usize, bit != 0);
+                sprite.push(pixel);
+                interpreter.graphics.xor_set(gfx_addr + j as usize, pixel != 0);
             }
 
             interpreter.execute(op);
