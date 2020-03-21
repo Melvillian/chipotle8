@@ -307,9 +307,8 @@ impl Interpreter {
                 let y_reg = self.v[y as usize];
 
                 let mut should_set_vf = false;
-                for i in 0..height {
-                    let byte = self.memory[self.addr as usize + i as usize];
-                    let row_delta = i * 8;
+                for row_delta in 0..height {
+                    let byte = self.memory[self.addr as usize + row_delta as usize];
                     for col_delta in 0..8 {
                         let is_black = ((byte >> (7 - col_delta)) & 1) == 1;
 
@@ -1248,12 +1247,13 @@ pub mod interpreter_tests {
             for i in 0..height {
                 for j in 0..8 {
                     let x_coord = (x_reg + j) % graphics::WIDTH as u8;
-                    let y_coord = (y_reg + (i * 8)) % graphics::WIDTH as u8;
+                    let y_coord = (y_reg + i) % graphics::HEIGHT as u8;
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
+
                     let mut pixel = 0;
                     if ((arb_byte >> (7 - j)) & 1) == 1 {
                         pixel = 0xFFFFFF;
                     }
-                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     assert_eq!(interpreter.graphics[gfx_addr], pixel);
                 }
@@ -1281,12 +1281,13 @@ pub mod interpreter_tests {
             for i in 0..height {
                 for j in 0..8 {
                     let x_coord = (x_reg + j) % graphics::WIDTH as u8;
-                    let y_coord = (y_reg + (i * 8)) % graphics::WIDTH as u8;
+                    let y_coord = (y_reg + i) % graphics::WIDTH as u8;
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
+
                     let mut pixel = 0;
                     if ((new_byte >> (7 - j)) & 1) == 1 {
                         pixel = 0xFFFFFF;
                     }
-                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     assert_eq!(interpreter.graphics[gfx_addr], pixel);
                 }
@@ -1301,12 +1302,43 @@ pub mod interpreter_tests {
             let op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
-            // set x and y regs to arbitrary values
-            interpreter.v[x as usize] = 1;
-            interpreter.v[y as usize] = 2;
+            // set x and y regs to coordinates so when we draw a sprite it will wrap around
+            // the buffer bottom to top
+            interpreter.v[x as usize] = 0;
+            interpreter.v[y as usize] = (graphics::HEIGHT - 1) as u8;
 
             let x_reg = interpreter.v[x as usize];
             let y_reg = interpreter.v[y as usize];
+
+            let starting_addr = interpreter.addr as usize;
+
+            let arb_byte: u8 = 0b11111111;
+            for i in 0 as usize..height as usize {
+
+                interpreter.memory[(starting_addr + i) as usize] = arb_byte;
+            }
+
+            for i in 0..interpreter.graphics.len() {
+                assert_eq!(interpreter.graphics[i], 0);
+            }
+
+            println!("{:?}", interpreter.graphics.buffer().to_vec());
+            interpreter.execute(op);
+            println!("{:?}", interpreter.graphics.buffer().to_vec());
+
+            // we now should have 2 rows worth sprite draw, 1 on the bottommost row and
+            // 1 one the top, both starting in the 0th column
+            for y_coord in &[graphics::HEIGHT as u8 -1, 0] {
+                for x_coord in 0..8 {
+                    let mut pixel = 0;
+                    if ((arb_byte >> (7 - x_coord)) & 1) == 1 {
+                        pixel = 0xFFFFFF;
+                    }
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, *y_coord);
+
+                    assert_eq!(interpreter.graphics[gfx_addr], pixel);
+                }
+            }
         }
 
         #[test]

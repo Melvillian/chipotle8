@@ -38,7 +38,7 @@ impl Graphics {
     #[inline]
     pub fn get_graphics_idx(x: u8, y: u8) -> usize {
         let column = x as usize;
-        let row = (y * 8) as usize;
+        let row = (y as usize * WIDTH) as usize;
 
         column + row
     }
