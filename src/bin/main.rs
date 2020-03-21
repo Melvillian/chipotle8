@@ -11,12 +11,14 @@ use std::time::{Duration, Instant};
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 32;
+pub const ENLARGE_RATIO: usize = 10; // TODO make this part of interpreter crate
+
 
 fn main() -> Result<(), Error> {
     let mut window = Window::new(
         "Noise Test - Press ESC to exit",
-        WIDTH * 32,
-        HEIGHT * 32, // TODO do not hardcode
+        WIDTH * ENLARGE_RATIO,
+        HEIGHT * ENLARGE_RATIO, // TODO do not hardcode
         WindowOptions {
             resize: true,
             scale_mode: ScaleMode::UpperLeft,

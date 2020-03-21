@@ -20,6 +20,7 @@ const GAME_FILE_MEMORY_SIZE: usize =
     MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
+pub const ENLARGE_RATIO: usize = 10;
 
 mod graphics;
 mod op;
@@ -482,15 +483,19 @@ impl Interpreter {
             // once I've got the Interpreter working
 
             // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
-            // bitmap to a 32x32 bitmap of the same color
-            let mut display = Vec::with_capacity(32 * graphics::WIDTH * 32 * graphics::HEIGHT);
+            // bitmap to a 10x10 bitmap of the same color
+            let mut display = Vec::with_capacity(
+                ENLARGE_RATIO * graphics::WIDTH * ENLARGE_RATIO * graphics::HEIGHT);
             for (_, pix) in self.graphics.buffer().iter().enumerate() {
                 for _ in 0..(32 * 32) {
                     display.push(*pix);
                 }
             }
             window
-                .update_with_buffer(&display, graphics::WIDTH, graphics::HEIGHT)
+                .update_with_buffer(
+                    &display,
+                    graphics::WIDTH * ENLARGE_RATIO,
+                    graphics::HEIGHT * ENLARGE_RATIO)
                 .unwrap();
         }
     }

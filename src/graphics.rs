@@ -7,6 +7,7 @@ use std::iter::FromIterator;
 
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
+
 const NUM_KEYS: usize = 16;
 const BLACK_RGB: u32 = 0xFFFFFF;
 const WHITE_RGB: u32 = 0x000000;
