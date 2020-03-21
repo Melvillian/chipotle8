@@ -457,7 +457,7 @@ impl Interpreter {
 
     /// Draw the 64x32 pixel map
     pub fn draw(&self, window: &mut Window) {
-        if self.prev_op.is_none() || Interpreter::is_display_op(self.prev_op.unwrap()) {
+        if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             // TODO don't hardcode window size. Make a Display struct that handles resizing
             // once I've got the Interpreter working
 
@@ -494,7 +494,10 @@ impl Interpreter {
 
             // advance to the next instruction
             self.prev_op = Some(op);
-            self.pc = self.pc + 2;
+
+            if Self::should_advance_pc(op) {
+                self.pc+=2;
+            }
 
             self.decrement_timers();
 
@@ -511,6 +514,17 @@ impl Interpreter {
         match op {
             Op::DispDraw(_, _, _) | Op::DispClear => true,
             _ => false,
+        }
+    }
+
+    /// Return true if this operation is one of the many Ops for which we should
+    /// increment the program counter. All Ops except those which cause the Interpreter
+    /// to jump to an instruction in memory (e.g. Return, Goto, GotoSubRtn and GotoPlusV0) should
+    /// advance the program counter
+    fn should_advance_pc(op: Op) -> bool {
+        match op {
+            Op::Return | Op::Goto(_, _, _) | Op::GotoSubRtn(_, _, _) | Op::GotoPlusV0(_, _, _) => false,
+            _ => true,
         }
     }
 
