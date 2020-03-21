@@ -25,31 +25,6 @@ pub const ENLARGE_RATIO: usize = 10;
 mod graphics;
 mod op;
 
-// # Interpreter
-// * 4096 (0x1000) bytes of memory
-// * interpretor exists in the first 512 (0x200) bytes
-// * uppermost 256 (0xF00-0xFFF) bytes are used for display refresh
-// * 96 (0xEB0-0xEFF) for call stack, internal use and other variables
-// * 16 8-bit registers: V0 - VF
-// * VF if used is the carry flag in addition operations, "no borrow" flag in subtraction, in draw
-// operation the VF flag is set to denote pixel collision
-// * the address register I is 16 bits wide
-// the stack is only used to store return addresses when subroutines are called
-
-// # Timers
-// * two timers running at 60 hertz
-//  - delay timer is used for events, it can be set and read
-//  - sound timer beeps when its value is nonzero
-
-// # Input
-// there is a 16 symbol hex keyboard with values 0 - F. There are 3 opcode that deal with handling input
-//  - one skips an instruction if a specific key is pressed
-//  - one skips an instruction if a specific key is NOT pressed
-//  - waits for a key press and stores it in a register once it detects it
-
-// # Graphics
-// 64x32 pixels
-
 /// Stores data needed to handle instruction FX0A
 #[derive(Default, Debug, PartialEq,)]
 struct FX0AMetadata {
@@ -81,6 +56,11 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
+    /// Creates an Interpreter with an optional Logger which will then need to have `initialize`
+    /// called on it to load in the game file.
+    ///
+    /// Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
+    /// See http://xion.io/post/code/rust-optional-args.html
     pub fn new<L : Into<Option<slog::Logger>>>(logger: L) -> Self {
 
         let log = logger.into().unwrap_or({
@@ -1300,7 +1280,7 @@ pub mod interpreter_tests {
         }
 
         #[test]
-        fn display_op_wrap() {
+        fn display_op_wrap_bottom_to_top() {
             let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xD012;
@@ -1327,9 +1307,7 @@ pub mod interpreter_tests {
                 assert_eq!(interpreter.graphics[i], 0);
             }
 
-            println!("{:?}", interpreter.graphics.buffer().to_vec());
             interpreter.execute(op);
-            println!("{:?}", interpreter.graphics.buffer().to_vec());
 
             // we now should have 2 rows worth sprite draw, 1 on the bottommost row and
             // 1 one the top, both starting in the 0th column
@@ -1340,6 +1318,53 @@ pub mod interpreter_tests {
                         pixel = 0xFFFFFF;
                     }
                     let gfx_addr = Graphics::get_graphics_idx(x_coord, *y_coord);
+
+                    assert_eq!(interpreter.graphics[gfx_addr], pixel);
+                }
+            }
+        }
+
+        #[test]
+        fn display_op_wrap_right_to_left() {
+            let mut interpreter = Interpreter::new(None);
+
+            let instr: usize = 0xD012;
+            let op = Op::from(instr as u16);
+            let (x, y, height) = usize_to_three_nibbles(instr);
+
+            // set x and y regs to coordinates so when we draw a sprite it will wrap around
+            // the buffer right to left
+            interpreter.v[x as usize] = (graphics::WIDTH - 1) as u8;
+            interpreter.v[y as usize] = 0;
+
+            let x_reg = interpreter.v[x as usize];
+            let y_reg = interpreter.v[y as usize];
+
+            let starting_addr = interpreter.addr as usize;
+
+            let arb_byte: u8 = 0b11111111;
+            for i in 0 as usize..height as usize {
+                interpreter.memory[(starting_addr + i) as usize] = arb_byte;
+            }
+
+            for i in 0..interpreter.graphics.len() {
+                assert_eq!(interpreter.graphics[i], 0);
+            }
+
+            interpreter.execute(op);
+
+            // we now should have 2 rows worth sprite draw, 1 on the first row with one pixel
+            // on the right side and 7 pixels on the left, and the same for the second row directly
+            // below it
+            for y_delta in 0..height {
+                for x_delta in 0..8 {
+                    let mut pixel = 0;
+                    if ((arb_byte >> (7 - x_delta)) & 1) == 1 {
+                        pixel = 0xFFFFFF;
+                    }
+                    let x_coord = x_reg + x_delta;
+                    let y_coord = y_reg + y_delta - 1;
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
 
                     assert_eq!(interpreter.graphics[gfx_addr], pixel);
                 }
