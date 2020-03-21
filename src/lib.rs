@@ -150,7 +150,7 @@ impl Interpreter {
             }
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
-                self.stack[self.sp] = self.pc;
+                self.stack[self.sp] = self.pc + 2;
                 self.sp+=1;
 
                 // jump to the subroutine
