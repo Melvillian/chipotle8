@@ -303,20 +303,19 @@ impl Interpreter {
                 self.v[x as usize] = random_byte & eight_bits;
             }
             Op::DispDraw(x, y, height) => {
-                let x_coord = self.v[x as usize] % graphics::WIDTH as u8;
-                let y_coord = self.v[y as usize] % graphics::HEIGHT as u8;
-
-                let gfx_start_idx = Graphics::get_graphics_idx(x_coord, y_coord);
+                let x_reg = self.v[x as usize];
+                let y_reg = self.v[y as usize];
 
                 let mut should_set_vf = false;
-                for i in 0 as usize..height as usize {
-                    let byte = self.memory[self.addr as usize + i];
-                    let row = i * 8 as usize;
-                    for j in 0 as usize..8 as usize {
-                        let is_black = ((byte >> (7 - j)) & 1) == 1;
+                for i in 0..height {
+                    let byte = self.memory[self.addr as usize + i as usize];
+                    let row_delta = i * 8;
+                    for col_delta in 0..8 {
+                        let is_black = ((byte >> (7 - col_delta)) & 1) == 1;
 
-                        let gfx_offset = row + j;
-                        let gfx_idx = (gfx_start_idx + gfx_offset) % self.graphics.len();
+                        let x_coord = (x_reg + col_delta) % graphics::WIDTH as u8;
+                        let y_coord = (y_reg + row_delta) % graphics::HEIGHT as u8;
+                        let gfx_idx = Graphics::get_graphics_idx(x_coord, y_coord);
 
                         let is_collision = self.graphics.xor_set(gfx_idx, is_black);
                         if is_collision {
@@ -1196,6 +1195,7 @@ pub mod interpreter_tests {
             // very infrequently, which I can live with.
 
             let mut num_different = 0;
+            let mut new_reg_vals = vec!(prev_byte);
             for _ in 0..10 {
                 interpreter.execute(op);
 
@@ -1210,11 +1210,11 @@ pub mod interpreter_tests {
                 prev_byte = reg_val;
             }
 
-            assert!(num_different > 5);
+            assert!(num_different > 5, format!("{:?}", new_reg_vals));
         }
 
         #[test]
-        fn display_op_collision() {
+        fn display_op_collision_and_no_collision() {
             let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xD012;
@@ -1233,20 +1233,10 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.addr, 0);
             let starting_addr = interpreter.addr as usize;
 
-            let mut sprite = Vec::with_capacity((height * 8) as usize);
+            let arb_byte: u8 = 0b10101010;
             for i in 0 as usize..height as usize {
-                // we use a random byte so that this test covers more possible cases
-                let random_byte: u8 = thread_rng().gen();
 
-                // store the bits of the sprite
-                for j in 0..8 {
-                    let mut pixel = 0;
-                    if ((random_byte >> (7 - j)) & 1) == 1 {
-                        pixel = 0xFFFFFF;
-                    }
-                    sprite.push(pixel);
-                }
-                interpreter.memory[(starting_addr + i) as usize] = random_byte;
+                interpreter.memory[(starting_addr + i) as usize] = arb_byte;
             }
 
             for i in 0..interpreter.graphics.len() {
@@ -1255,38 +1245,59 @@ pub mod interpreter_tests {
 
             interpreter.execute(op);
 
-            let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
-            for i in 0..height as usize * 8 as usize {
-                assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
+            for i in 0..height {
+                for j in 0..8 {
+                    let x_coord = (x_reg + j) % graphics::WIDTH as u8;
+                    let y_coord = (y_reg + (i * 8)) % graphics::WIDTH as u8;
+                    let mut pixel = 0;
+                    if ((arb_byte >> (7 - j)) & 1) == 1 {
+                        pixel = 0xFFFFFF;
+                    }
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
+
+                    assert_eq!(interpreter.graphics[gfx_addr], pixel);
+                }
             }
 
             // VF register should not have been set, because we only set VF when a pixel goes from
-            // 1 -> 0, and in this case they all started out at 1.
+            // 1 -> 0, and in this case they all started out at 0.
             assert_eq!(interpreter.v[0xf], 0);
 
             // now let's set them all to 0, and see that VF gets set to 1. NOTE. In the extremely
             // unlikely chance that the random bytes were all 0 and we don't end up flipping any bits
             // here, count yourself one of the luckiest humans alive
 
-            // first set all bits for the pixels we'll use to 0
+            // first set all bits for the pixels we'll use to 1 to there will be
+            // a collision
             for i in 0 as usize..height as usize {
-                interpreter.memory[(starting_addr + i) as usize] = 0;
+                interpreter.memory[(starting_addr + i) as usize] = 0xFF;
             }
 
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[0xf], 1);
 
-            for i in 0..interpreter.graphics.len() {
-                assert_eq!(interpreter.graphics[i], 0);
+            let new_byte = 0b01010101;
+            for i in 0..height {
+                for j in 0..8 {
+                    let x_coord = (x_reg + j) % graphics::WIDTH as u8;
+                    let y_coord = (y_reg + (i * 8)) % graphics::WIDTH as u8;
+                    let mut pixel = 0;
+                    if ((new_byte >> (7 - j)) & 1) == 1 {
+                        pixel = 0xFFFFFF;
+                    }
+                    let gfx_addr = Graphics::get_graphics_idx(x_coord, y_coord);
+
+                    assert_eq!(interpreter.graphics[gfx_addr], pixel);
+                }
             }
         }
 
         #[test]
-        fn display_op_no_collision() {
+        fn display_op_wrap() {
             let mut interpreter = Interpreter::new(None);
 
-            let instr: usize = 0xD011; // height is 1, so only 8 bits
+            let instr: usize = 0xD012;
             let op = Op::from(instr as u16);
             let (x, y, height) = usize_to_three_nibbles(instr);
 
@@ -1296,37 +1307,6 @@ pub mod interpreter_tests {
 
             let x_reg = interpreter.v[x as usize];
             let y_reg = interpreter.v[y as usize];
-
-            // add arbitrary values starting at the memory address in I (which will be 0)
-            // because these will be the values that get written to the graphics array
-
-            assert_eq!(interpreter.addr, 0);
-            let starting_addr = interpreter.addr as usize;
-
-            let mut sprite = Vec::with_capacity(8);
-            let arb_byte = 0b10101010;
-
-            interpreter.memory[starting_addr] = arb_byte;
-
-            // store the same bits we're setting in the op so we won't set reg VF to 1
-            let gfx_addr = Graphics::get_graphics_idx(x_reg, y_reg);
-
-            for j in 0..8 {
-                let mut pixel = 0;
-                if ((arb_byte >> (7 - j)) & 1) == 1 {
-                    pixel = 0xFFFFFF;
-                }
-                sprite.push(pixel);
-                interpreter.graphics.xor_set(gfx_addr + j as usize, pixel != 0);
-            }
-
-            interpreter.execute(op);
-
-            for i in 0..height as usize * 8 as usize {
-                assert_eq!(interpreter.graphics[gfx_addr + i], sprite[i]);
-            }
-
-            assert_eq!(interpreter.v[0xf], 0);
         }
 
         #[test]

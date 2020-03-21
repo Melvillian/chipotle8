@@ -58,6 +58,7 @@ impl Graphics {
     #[inline]
     pub fn xor_set(&mut self, idx: usize, enabled: bool) -> bool {
         let prev_pix = self.buffer[idx];
+
         if enabled {
             self.buffer[idx]^=BLACK_RGB;
         } else {
