@@ -1192,7 +1192,7 @@ pub mod interpreter_tests {
             // very infrequently, which I can live with.
 
             let mut num_different = 0;
-            let mut new_reg_vals = vec!(prev_byte);
+            let mut new_reg_vals = vec!();
             for _ in 0..10 {
                 interpreter.execute(op);
 
@@ -1203,11 +1203,12 @@ pub mod interpreter_tests {
                     // it changed
                     num_different+=1;
                 }
+                new_reg_vals.push((prev_byte, reg_val));
 
                 prev_byte = reg_val;
             }
 
-            assert!(num_different > 5, format!("{:?}", new_reg_vals));
+            assert!(num_different > 5, format!("number_different: {:?}", new_reg_vals));
         }
 
         #[test]
