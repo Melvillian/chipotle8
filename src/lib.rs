@@ -1,6 +1,7 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
 use crate::graphics::Graphics;
+use crate::keyboard::Keyboard;
 use minifb::{Key, KeyRepeat, Window};
 use op::Op;
 use rand::{thread_rng, Rng};
@@ -25,16 +26,10 @@ const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
 const MS_PER_SECOND: u64 = 1000;
 // 1000 / 60 == 16 milliseconds between each update
 pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
+
 mod graphics;
 mod op;
-
-/// Stores data needed to handle instruction FX0A
-#[derive(Default, Debug, PartialEq,)]
-struct FX0AMetadata {
-    should_block_on_keypress: bool, // set to true if CPU is waiting on a keypress
-    last_key_pressed: Option<Key>,  // once a key is pressed store it here
-    register: Option<u8>,           // the register to store the pressed key in
-}
+mod keyboard;
 
 pub struct Interpreter {
     memory: [u8; 4096], // 4k of RAM
@@ -52,11 +47,12 @@ pub struct Interpreter {
 
     graphics: Graphics, // 64x32 pixel monochrome screen
 
+    keyboard: Keyboard, // Stores the state of all keyboard input
+
     delay_timer: u8,             // 60 Hz timer that can be set and read
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
     sound_timer: u8,             // 60 Hz timer that beeps whenever it is nonzero
     sound_timer_settime: time::Instant, // the instant we last set the sound_timer
-    fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
     logger: Logger,
 }
 
@@ -86,15 +82,11 @@ impl Interpreter {
             pc: 0,
             v: [0; 16],
             graphics: Graphics::new(),
+            keyboard: Keyboard::new(),
             delay_timer: 0,
             delay_timer_settime: time::Instant::now(),
             sound_timer: 0,
             sound_timer_settime: time::Instant::now(),
-            fx0a_metadata: FX0AMetadata {
-                should_block_on_keypress: false,
-                last_key_pressed: None,
-                register: None,
-            },
             logger: log,
         };
 
@@ -320,7 +312,7 @@ impl Interpreter {
             }
             Op::KeyOpEqVx(x) => {
                 let x_reg = self.v[x as usize];
-                let is_pressed = self.graphics.get_key_state(x_reg as usize);
+                let is_pressed = self.keyboard.get_key_state(x_reg as usize);
 
                 if is_pressed {
                     self.skip_instruction();
@@ -328,7 +320,7 @@ impl Interpreter {
             }
             Op::KeyOpNeVx(x) => {
                 let x_reg = self.v[x as usize];
-                let is_pressed = self.graphics.get_key_state(x_reg as usize);
+                let is_pressed = self.keyboard.get_key_state(x_reg as usize);
 
                 if !is_pressed {
                     self.skip_instruction();
@@ -345,7 +337,7 @@ impl Interpreter {
 
                 self.v[x as usize] = self.delay_timer.saturating_sub(num_decrement);
             },
-            Op::KeyOpGet(x) => self.go_to_blocking_state(x),
+            Op::KeyOpGet(x) => self.keyboard.go_to_blocking_state(x),
             Op::DelaySet(x) => {
                 self.delay_timer = self.v[x as usize];
                 self.delay_timer_settime = time::Instant::now();
@@ -417,24 +409,6 @@ impl Interpreter {
         self.delay_timer.saturating_sub(num_decrement)
     }
 
-    /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
-    /// the blocking state once a keypress gets detected
-    fn go_to_blocking_state(&mut self, reg: u8) {
-        self.fx0a_metadata.should_block_on_keypress = true;
-        self.fx0a_metadata.register = Some(reg);
-    }
-
-    /// Handle and reset the Interpreter from a key press. Only gets called
-    /// when the Interpreter is blocking as a result of a prior FX0A instruction
-    fn return_from_blocking_state(&mut self, key_idx: u8) {
-        let reg_idx = self
-            .fx0a_metadata
-            .register
-            .expect("invalid FXOA metadata state");
-        self.v[reg_idx as usize] = key_idx;
-        self.fx0a_metadata = FX0AMetadata::default();
-    }
-
     /// Return the decoded Op at the current program counter. Does not increment the program counter
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
@@ -455,33 +429,18 @@ impl Interpreter {
     fn handle_key_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
         keys_pressed.as_ref().map(|keys| {
             let key_idxs: Vec<usize> = keys.iter()
-                .map(Graphics::map_key)
+                .map(Keyboard::map_key)
                 .filter(Option::is_some)
                 .map(Option::unwrap)
                 .collect();
 
-            self.graphics.update_keyboard_with_vec(&key_idxs);
+            self.keyboard.update_keyboard_with_vec(&key_idxs);
 
-            self.handle_fx0a_state(keys);
+            let (reg_idx, key) = self.keyboard.handle_fx0a_state(keys);
+            if reg_idx.is_some() && key.is_some() {
+                self.v[reg_idx.unwrap()] = key.unwrap();
+            }
         });
-    }
-
-    /// Checks if we're in a blocking state, and if a valid key has been pressed
-    /// transitions out of the blocking state
-    fn handle_fx0a_state(&mut self, keys: &Vec<Key>) {
-        // check if the FX0A instruction has us in a blocking state and if we can now unblock
-        if self.fx0a_metadata.should_block_on_keypress {
-            let key_inputs: Vec<usize> = keys.iter()
-                .map(Graphics::map_key)
-                .filter(Option::is_some)
-                .map(Option::unwrap)
-                .collect();
-
-            // we choose of the first key because we have to choose SOME key, so why not the first?
-            key_inputs.get(0).map(|k| {
-                self.return_from_blocking_state(*k as u8);
-            });
-        }
     }
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
@@ -508,7 +467,7 @@ impl Interpreter {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
         let op = self.get_instr_at_pc();
-        if !self.fx0a_metadata.should_block_on_keypress {
+        if !self.keyboard.is_blocking() {
             debug!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
               self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
 
@@ -1418,12 +1377,12 @@ pub mod interpreter_tests {
             let (x, _, _) = usize_to_three_nibbles(instr);
             let x_reg = interpreter.v[x as usize] as usize;
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down and up the key in reg
-            interpreter.graphics.handle_key_down(&Key::Key1);
-            interpreter.graphics.handle_key_up(&Key::Key1);
+            interpreter.keyboard.handle_key_down(&Key::Key1);
+            interpreter.keyboard.handle_key_up(&Key::Key1);
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc, 0);
@@ -1439,14 +1398,14 @@ pub mod interpreter_tests {
             interpreter.v[x as usize] = 1; // setup x register for keypress
             let x_reg = interpreter.v[x as usize] as usize;
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.graphics.handle_key_down(&Key::Key1);
+            interpreter.keyboard.handle_key_down(&Key::Key1);
             interpreter.execute(op);
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), true);
             assert_eq!(interpreter.pc, 2);
         }
 
@@ -1459,7 +1418,7 @@ pub mod interpreter_tests {
             let (x, _, _) = usize_to_three_nibbles(instr);
             let x_reg = interpreter.v[x as usize] as usize;
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
             assert_eq!(interpreter.pc, 0);
 
             interpreter.execute(op);
@@ -1477,14 +1436,14 @@ pub mod interpreter_tests {
             interpreter.v[x as usize] = 1; // setup x register for keypress
             let x_reg = interpreter.v[x as usize] as usize;
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.graphics.handle_key_down(&Key::Key1);
+            interpreter.keyboard.handle_key_down(&Key::Key1);
             interpreter.execute(op);
 
-            assert_eq!(interpreter.graphics.get_key_state(x_reg), true);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg), true);
             assert_eq!(interpreter.pc, 0);
         }
 
@@ -1532,13 +1491,11 @@ pub mod interpreter_tests {
 
             assert_eq!(interpreter.v[x as usize], 0);
             assert_eq!(interpreter.pc, 0);
-            assert_eq!(interpreter.fx0a_metadata, FX0AMetadata::default());
+            assert_eq!(interpreter.keyboard.is_blocking(), false);
 
             interpreter.cycle();
 
-            assert_eq!(interpreter.fx0a_metadata.should_block_on_keypress, true);
-            assert_eq!(interpreter.fx0a_metadata.last_key_pressed, None);
-            assert_eq!(interpreter.fx0a_metadata.register, Some(x));
+            assert_eq!(interpreter.keyboard.is_blocking(), true);
             assert_eq!(interpreter.pc, 2);
 
             // assert that cycle does not advance the program counter forward like it should
