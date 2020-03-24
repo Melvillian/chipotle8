@@ -4,9 +4,11 @@ use minifb::Key;
 use std::ops::Index;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use minifb::Window;
 
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
+pub const ENLARGE_RATIO: usize = 10;
 
 const NUM_KEYS: usize = 16;
 const BLACK_RGB: u32 = 0xFFFFFF;
@@ -14,6 +16,7 @@ const WHITE_RGB: u32 = 0x000000;
 
 pub struct Graphics {
     buffer: [u32; WIDTH * HEIGHT],
+    display: Vec<u32>,
     key_input: FixedBitSet,  // 16 bit hex keyboard input (0-F).
                              // Each bit stores the 1 (on) or 0 (off) keypress state
 }
@@ -23,6 +26,9 @@ impl Graphics {
         Graphics {
             buffer: [0; WIDTH * HEIGHT],
             key_input: FixedBitSet::with_capacity(NUM_KEYS),
+            // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
+            // bitmap to an ENLARGE_RATIO-by-ENLARGE_RATIO bitmap of the same color
+            display: vec![0; (ENLARGE_RATIO * WIDTH) * (ENLARGE_RATIO * HEIGHT)],
         }
     }
 
@@ -166,6 +172,32 @@ impl Graphics {
     /// Return the bool value of the bit at the given index
     pub fn get_key_state(&self, idx: usize) -> bool {
         self.key_input[idx]
+    }
+
+    /// Draw the 64x32 bit buffer to a Window. We enlarge the 64x32 resolution by ENLARGE_RATIO
+    /// because otherwise the screen is far too small to view
+    pub fn draw(&mut self, window: &mut Window) {
+        // TODO don't hardcode window size. Make a Display struct that handles resizing
+
+        for y in 0..(HEIGHT * ENLARGE_RATIO) {
+            let y_offset = y * WIDTH * ENLARGE_RATIO;
+            for x in 0..(WIDTH * ENLARGE_RATIO) {
+                let buffer_idx = Self::get_graphics_idx(
+                    (x / ENLARGE_RATIO) as u8,
+                    (y / ENLARGE_RATIO) as u8
+                );
+                let pixel = self.buffer()[buffer_idx];
+                let display_idx = y_offset + x;
+                self.display[display_idx] = pixel;
+            }
+        }
+
+        window
+            .update_with_buffer(
+                &self.display,
+                WIDTH * ENLARGE_RATIO,
+                HEIGHT * ENLARGE_RATIO)
+            .unwrap();
     }
 }
 

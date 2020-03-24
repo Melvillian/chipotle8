@@ -21,7 +21,6 @@ const GAME_FILE_MEMORY_SIZE: usize =
     MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
-pub const ENLARGE_RATIO: usize = 10;
 const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
 const MS_PER_SECOND: u64 = 1000;
 // 1000 / 60 == 16 milliseconds between each update
@@ -492,41 +491,13 @@ impl Interpreter {
         self.pc+=2;
     }
 
-    /// Draw the 64x32 pixel map
-    pub fn draw(&self, window: &mut Window) {
-        let now = time::Instant::now();
+    /// Draw the 64x32 bit buffer to a Window. We enlarge the 64x32 resolution by ENLARGE_RATIO
+    /// because otherwise the screen is far too small to view
+    pub fn draw(&mut self, window: &mut Window) {
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
-            // TODO don't hardcode window size. Make a Display struct that handles resizing
-            // and keep the display Vec in memory so we don't keep reallocating it
-            // once I've got the Interpreter working
-
-            // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
-            // bitmap to an ENLARGE_RATIO-by-ENLARGE_RATIO bitmap of the same color
-            let mut display = vec![0;
-               (ENLARGE_RATIO as usize * graphics::WIDTH) *
-               (ENLARGE_RATIO as usize * graphics::HEIGHT)
-            ];
-
-            for y in 0..(graphics::HEIGHT * ENLARGE_RATIO) {
-                let y_offset = y * graphics::WIDTH * ENLARGE_RATIO;
-                for x in 0..(graphics::WIDTH * ENLARGE_RATIO) {
-                    let buffer_idx = Graphics::get_graphics_idx(
-                        (x / ENLARGE_RATIO) as u8,
-                        (y / ENLARGE_RATIO) as u8
-                    );
-                    let pixel = self.graphics.buffer()[buffer_idx];
-                    let display_idx = y_offset + x;
-                    display[display_idx] = pixel;
-                }
-            }
-
-            window
-                .update_with_buffer(
-                    &display,
-                    graphics::WIDTH * ENLARGE_RATIO,
-                    graphics::HEIGHT * ENLARGE_RATIO)
-                .unwrap();
+            self.graphics.draw(window);
         }
+
     }
 
     /// step forward one cycle in the interpreter. A cycle consists of:
@@ -613,6 +584,8 @@ impl Interpreter {
         self.decrement_sound_timer_after_cycle();
     }
 
+    /// Decrement the delay timer and update the delay timer's set time, but only do so if more
+    /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_delay_timer_after_cycle(&mut self) {
         let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
         let num_decrements = ms_since_last_delay_set / TIMER_CYCLE_INTERVAL;
@@ -622,6 +595,8 @@ impl Interpreter {
         }
     }
 
+    /// Decrement the sound timer and update the sound timer's set time, but only do so if more
+    /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_sound_timer_after_cycle(&mut self) {
         let ms_since_last_sound_set = self.sound_timer_settime.elapsed().as_millis() as u64;
         let num_decrements = ms_since_last_sound_set / (TIMER_CYCLE_INTERVAL);
