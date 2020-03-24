@@ -529,12 +529,11 @@ impl Interpreter {
         }
     }
 
-    /// step forward one cycle in the interpreter and return Op executed this cycle or None if
-    /// we're currently blocking. A cycle consists of:
+    /// step forward one cycle in the interpreter. A cycle consists of:
     /// 1. read the instruction at the program counter
     /// 2. decode it
     /// 3. execute it
-    pub fn cycle(&mut self) -> Op {
+    pub fn cycle(&mut self) {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
         let op = self.get_instr_at_pc();
@@ -556,8 +555,6 @@ impl Interpreter {
             debug!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
                   self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
-
-        op
     }
 
     /// Return true if this op is related to the display. Later we use
