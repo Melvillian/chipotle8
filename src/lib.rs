@@ -7,6 +7,7 @@ use rand::{thread_rng, Rng};
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
+use std::time;
 use slog::{debug, info};
 use sloggers::Build;
 use sloggers::terminal::{TerminalLoggerBuilder, Destination};
@@ -21,7 +22,10 @@ const GAME_FILE_MEMORY_SIZE: usize =
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 pub const ENLARGE_RATIO: usize = 10;
-
+const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
+const MS_PER_SECOND: u64 = 1000;
+// 1000 / 60 == 16 milliseconds between each update
+pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 mod graphics;
 mod op;
 
@@ -50,9 +54,12 @@ pub struct Interpreter {
     graphics: Graphics, // 64x32 pixel monochrome screen
 
     delay_timer: u8,             // 60 Hz timer that can be set and read
+    delay_timer_settime: time::Instant, // the instant we last set the delay_timer
     sound_timer: u8,             // 60 Hz timer that beeps whenever it is nonzero
+    sound_timer_settime: time::Instant, // the instant we last set the sound_timer
     fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
     logger: Logger,
+    cnt: u32,
 }
 
 impl Interpreter {
@@ -82,13 +89,16 @@ impl Interpreter {
             v: [0; 16],
             graphics: Graphics::new(),
             delay_timer: 0,
+            delay_timer_settime: time::Instant::now(),
             sound_timer: 0,
+            sound_timer_settime: time::Instant::now(),
             fx0a_metadata: FX0AMetadata {
                 should_block_on_keypress: false,
                 last_key_pressed: None,
                 register: None,
             },
             logger: log,
+            cnt: 0,
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter
@@ -131,7 +141,7 @@ impl Interpreter {
 
     /// Update the state of the interpreter by running the operation
     fn execute(&mut self, op: Op) {
-        info!(self.logger, "executing op: {:?}", op);
+        debug!(self.logger, "executing op: {:?}", op);
         match op {
             Op::CallRca(_, _, _) => panic!("found CallRca Op {:?}", op), // assume this won't be called
             Op::DispClear => {
@@ -279,6 +289,7 @@ impl Interpreter {
             }
             Op::Rand(x, msb, lsb) => {
                 let random_byte: u8 = thread_rng().gen();
+                // TODO debug this further, current cunch is that it generates 16u8 more than it should
                 let eight_bits = two_nibbles_to_u8(msb, lsb);
 
                 self.v[x as usize] = random_byte & eight_bits;
@@ -325,10 +336,26 @@ impl Interpreter {
                     self.skip_instruction();
                 }
             }
-            Op::DelayGet(x) => self.v[x as usize] = self.delay_timer,
+            Op::DelayGet(x) => {
+                // we need to do this more complicated calculation because some time might have
+                // passed since we last set the delay_timer, and so we make up for it by calculating
+                // what the delay_timer would have been had we set it exactly at every 16ms. This
+                // isn't a realtime operating system so we can't guarantee that a cycle gets run on
+                // a timely basis
+                let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
+                let num_decrement = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
+
+                self.v[x as usize] = self.delay_timer.saturating_sub(num_decrement);
+            },
             Op::KeyOpGet(x) => self.go_to_blocking_state(x),
-            Op::DelaySet(x) => self.delay_timer = self.v[x as usize],
-            Op::SoundSet(x) => self.sound_timer = self.v[x as usize],
+            Op::DelaySet(x) => {
+                self.delay_timer = self.v[x as usize];
+                self.delay_timer_settime = time::Instant::now();
+            },
+            Op::SoundSet(x) => {
+                self.sound_timer = self.v[x as usize];
+                self.sound_timer_settime = time::Instant::now();
+            },
             Op::MemIPlusEqVx(x) => {
                 let reg = self.v[x as usize];
 
@@ -385,6 +412,13 @@ impl Interpreter {
         }
     }
 
+    fn get_delay_state(&self) -> u8 {
+        let ms_since_last_delay_set = (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
+        let num_decrement = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
+
+        self.delay_timer.saturating_sub(num_decrement)
+    }
+
     /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
     /// the blocking state once a keypress gets detected
     fn go_to_blocking_state(&mut self, reg: u8) {
@@ -407,7 +441,7 @@ impl Interpreter {
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
-        info!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
+        debug!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
@@ -461,6 +495,7 @@ impl Interpreter {
 
     /// Draw the 64x32 pixel map
     pub fn draw(&self, window: &mut Window) {
+        let now = time::Instant::now();
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             // TODO don't hardcode window size. Make a Display struct that handles resizing
             // once I've got the Interpreter working
@@ -481,6 +516,7 @@ impl Interpreter {
                     graphics::HEIGHT * ENLARGE_RATIO)
                 .unwrap();
         }
+        println!("elapsed: {}", now.elapsed().as_millis());
     }
 
     /// step forward one cycle in the interpreter and return Op executed this cycle or None if
@@ -489,9 +525,14 @@ impl Interpreter {
     /// 2. decode it
     /// 3. execute it
     pub fn cycle(&mut self) -> Op {
+        let msb = self.memory[self.pc];
+        let lsb = self.memory[self.pc + 1];
+        self.cnt+=1;
+        println!("time: {:?}, {} pc: {}, instr: {:04x}, regs: {:?}, delay: {}", std::time::Instant::now(), self.cnt, self.pc, two_u8s_to_u16(msb, lsb), self.v.to_vec(), self.get_delay_state());
+        // TODO delete above
         let op = self.get_instr_at_pc();
         if !self.fx0a_metadata.should_block_on_keypress {
-            info!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+            debug!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
               self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
 
                   self.execute(op);
@@ -503,9 +544,9 @@ impl Interpreter {
                 self.pc+=2;
             }
 
-            self.decrement_timers();
+            self.decrement_timers_after_cycle();
 
-            info!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+            debug!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
                   self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
         }
 
@@ -560,13 +601,30 @@ impl Interpreter {
         Ok(())
     }
 
-    /// Subtract the delay and sound timers until they reach 0, at which point stop subtracting
-    fn decrement_timers(&mut self) {
-        if self.delay_timer > 0 {
-            self.delay_timer-=1;
+    /// Decrement the delay and sound timers until they reach 0, at which point stop subtracting.
+    /// We only decrement if sufficient time has passed. Since we want to run at 60 Hz, we'll only
+    /// update if it's been at least 1000 / 60 == 16.66667 milliseconds since the last update
+    fn decrement_timers_after_cycle(&mut self) {
+        self.decrement_delay_timer_after_cycle();
+        self.decrement_sound_timer_after_cycle();
+    }
+
+    fn decrement_delay_timer_after_cycle(&mut self) {
+        let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
+        let num_decrements = ms_since_last_delay_set / TIMER_CYCLE_INTERVAL;
+        for _ in 0..num_decrements {
+            self.delay_timer = self.delay_timer.saturating_sub(1);
+            self.delay_timer_settime = time::Instant::now();
         }
-        if self.sound_timer > 0 {
-            self.sound_timer-=1;
+    }
+
+    fn decrement_sound_timer_after_cycle(&mut self) {
+        let ms_since_last_sound_set = self.sound_timer_settime.elapsed().as_millis() as u64;
+        let num_decrements = ms_since_last_sound_set / (TIMER_CYCLE_INTERVAL);
+
+        for _ in 0..num_decrements {
+            self.sound_timer = self.sound_timer.saturating_sub(1);
+            self.sound_timer_settime = time::Instant::now();
         }
     }
 }
@@ -1468,6 +1526,13 @@ pub mod interpreter_tests {
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[x as usize], 42);
+
+            // now wait 2 cycles worth of time, and make sure the value we get reflects the fact
+            // that time has passed
+            std::thread::sleep(std::time::Duration::from_millis(2 * TIMER_CYCLE_INTERVAL));
+            interpreter.execute(op);
+
+            assert_eq!(interpreter.v[x as usize], 40);
         }
 
         #[test]
@@ -1653,7 +1718,7 @@ pub mod interpreter_tests {
         }
 
         #[test]
-        fn delay_timer_dec() {
+        fn timer_dec() {
             let mut interpreter = Interpreter::new(None);
 
             let instr: usize = 0xFA65;
@@ -1664,19 +1729,28 @@ pub mod interpreter_tests {
             interpreter.delay_timer = 2;
             interpreter.sound_timer = 4;
 
-            interpreter.decrement_timers();
+            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL));
+            interpreter.decrement_timers_after_cycle();
 
             assert_eq!(interpreter.delay_timer, 1);
             assert_eq!(interpreter.sound_timer, 3);
 
-            interpreter.decrement_timers();
-            interpreter.decrement_timers();
+            // don't wait anytime, and we should see they don't decrement
+            interpreter.decrement_timers_after_cycle();
+
+            assert_eq!(interpreter.delay_timer, 1);
+            assert_eq!(interpreter.sound_timer, 3);
+
+            // now wait 2 interval's worth so they try to decrement by 2
+            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL * 2));
+            interpreter.decrement_timers_after_cycle();
 
             assert_eq!(interpreter.delay_timer, 0);
             assert_eq!(interpreter.sound_timer, 1);
 
-            interpreter.decrement_timers();
-            interpreter.decrement_timers();
+            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL * 2));
+            interpreter.decrement_timers_after_cycle();
+            interpreter.decrement_timers_after_cycle();
 
             assert_eq!(interpreter.delay_timer, 0);
             assert_eq!(interpreter.sound_timer, 0);

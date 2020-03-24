@@ -38,14 +38,12 @@ fn main() -> Result<(), Error> {
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let now = Instant::now();
-        if Instant::now().duration_since(earlier).as_micros() > 16000 { // update at 60 Hz
+        if earlier.elapsed().as_millis() > chipotle8::TIMER_CYCLE_INTERVAL.into() { // this ensures we run at 60 Hz
             earlier = now;
 
-            for _ in 0..10 { // 600 cycles per second
-                interpreter.cycle();
-                interpreter.handle_key_input(&window);
-                interpreter.draw(&mut window);
-            }
+            interpreter.cycle();
+            interpreter.handle_key_input(&window);
+            interpreter.draw(&mut window);
         }
     }
     Ok(())
