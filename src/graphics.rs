@@ -5,6 +5,7 @@ use std::ops::Index;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use minifb::Window;
+use std::time;
 
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
@@ -178,17 +179,47 @@ impl Graphics {
     /// because otherwise the screen is far too small to view
     pub fn draw(&mut self, window: &mut Window) {
         // TODO don't hardcode window size. Make a Display struct that handles resizing
+        let now = time::Instant::now();
+//        for y in 0..(HEIGHT * ENLARGE_RATIO) {
+//            let y_offset = y * WIDTH * ENLARGE_RATIO;
+//            for x in 0..(WIDTH * ENLARGE_RATIO) {
+//                let buffer_idx = Self::get_graphics_idx(
+//                    (x / ENLARGE_RATIO) as u8,
+//                    (y / ENLARGE_RATIO) as u8
+//                );
+//                let pixel = self.buffer()[buffer_idx];
+//                let display_idx = y_offset + x;
+//                self.display[display_idx] = pixel;
+//            }
+//        }
 
-        for y in 0..(HEIGHT * ENLARGE_RATIO) {
-            let y_offset = y * WIDTH * ENLARGE_RATIO;
-            for x in 0..(WIDTH * ENLARGE_RATIO) {
-                let buffer_idx = Self::get_graphics_idx(
-                    (x / ENLARGE_RATIO) as u8,
-                    (y / ENLARGE_RATIO) as u8
-                );
+        for y in 0..HEIGHT {
+            let y_offset = y * WIDTH * ENLARGE_RATIO * ENLARGE_RATIO;
+            for x in 0..WIDTH {
+                //if x == 2 { panic!("D");}
+                let buffer_idx = Self::get_graphics_idx(x as u8,y as u8);
                 let pixel = self.buffer()[buffer_idx];
-                let display_idx = y_offset + x;
-                self.display[display_idx] = pixel;
+
+                let x_offset = x * ENLARGE_RATIO;
+
+                // since each call to .draw reuses the same display Vec, we can save time by
+                // skipping writing a square by seeing if the same color already exists in the
+                // display Vec this time as it did before. Since the pixels rarely change, this will
+                // save us a lot of time.
+                if pixel == self.display[y_offset + x_offset] {
+                    continue;
+                }
+
+                // looks like the pixel changed, so we'll have to go through the hassle of
+                // writing it all to the display
+                for row_square in 0..ENLARGE_RATIO {
+                    let row_offset = row_square * WIDTH * ENLARGE_RATIO;
+                    for col_square in 0..ENLARGE_RATIO {
+                        let display_idx = (y_offset + row_offset) + (x_offset + col_square);
+                        self.display[display_idx] = pixel;
+
+                    }
+                }
             }
         }
 
