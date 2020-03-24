@@ -59,7 +59,6 @@ pub struct Interpreter {
     sound_timer_settime: time::Instant, // the instant we last set the sound_timer
     fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
     logger: Logger,
-    cnt: u32,
 }
 
 impl Interpreter {
@@ -98,7 +97,6 @@ impl Interpreter {
                 register: None,
             },
             logger: log,
-            cnt: 0,
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter
@@ -196,7 +194,8 @@ impl Interpreter {
             }
             Op::ConstAddVx(x, msb, lsb) => {
                 let byte = two_nibbles_to_u8(msb, lsb);
-                self.v[x as usize]+=byte;
+                let (sum, _) = self.v[x as usize].overflowing_add(byte);
+                self.v[x as usize] = sum;
             }
             Op::AssignVyToVx(x, y) => {
                 self.v[x as usize] = self.v[y as usize];
@@ -498,17 +497,29 @@ impl Interpreter {
         let now = time::Instant::now();
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             // TODO don't hardcode window size. Make a Display struct that handles resizing
+            // and keep the display Vec in memory so we don't keep reallocating it
             // once I've got the Interpreter working
 
             // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
-            // bitmap to a 10x10 bitmap of the same color
-            let mut display = Vec::with_capacity(
-                ENLARGE_RATIO * graphics::WIDTH * ENLARGE_RATIO * graphics::HEIGHT);
-            for (_, pix) in self.graphics.buffer().iter().enumerate() {
-                for _ in 0..(32 * 32) {
-                    display.push(*pix);
+            // bitmap to an ENLARGE_RATIO-by-ENLARGE_RATIO bitmap of the same color
+            let mut display = vec![0;
+               (ENLARGE_RATIO as usize * graphics::WIDTH) *
+               (ENLARGE_RATIO as usize * graphics::HEIGHT)
+            ];
+
+            for y in 0..(graphics::HEIGHT * ENLARGE_RATIO) {
+                let y_offset = y * graphics::WIDTH * ENLARGE_RATIO;
+                for x in 0..(graphics::WIDTH * ENLARGE_RATIO) {
+                    let buffer_idx = Graphics::get_graphics_idx(
+                        (x / ENLARGE_RATIO) as u8,
+                        (y / ENLARGE_RATIO) as u8
+                    );
+                    let pixel = self.graphics.buffer()[buffer_idx];
+                    let display_idx = y_offset + x;
+                    display[display_idx] = pixel;
                 }
             }
+
             window
                 .update_with_buffer(
                     &display,
@@ -516,7 +527,6 @@ impl Interpreter {
                     graphics::HEIGHT * ENLARGE_RATIO)
                 .unwrap();
         }
-        println!("elapsed: {}", now.elapsed().as_millis());
     }
 
     /// step forward one cycle in the interpreter and return Op executed this cycle or None if
@@ -527,9 +537,6 @@ impl Interpreter {
     pub fn cycle(&mut self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
-        self.cnt+=1;
-        println!("time: {:?}, {} pc: {}, instr: {:04x}, regs: {:?}, delay: {}", std::time::Instant::now(), self.cnt, self.pc, two_u8s_to_u16(msb, lsb), self.v.to_vec(), self.get_delay_state());
-        // TODO delete above
         let op = self.get_instr_at_pc();
         if !self.fx0a_metadata.should_block_on_keypress {
             debug!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",

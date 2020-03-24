@@ -16,7 +16,7 @@ pub const ENLARGE_RATIO: usize = 10; // TODO make this part of interpreter crate
 
 fn main() -> Result<(), Error> {
     let mut window = Window::new(
-        "Noise Test - Press ESC to exit",
+        "Chip 8 Interpreter (In Rust!)",
         WIDTH * ENLARGE_RATIO,
         HEIGHT * ENLARGE_RATIO, // TODO do not hardcode
         WindowOptions {
