@@ -193,6 +193,8 @@ impl Graphics {
 //            }
 //        }
 
+        // TODO: nit: refactor looping logic so that it is more cache friendly. Right now
+        // we are jumping ahead in the array too much and thrashing the lowest level cache.
         for y in 0..HEIGHT {
             let y_offset = y * WIDTH * ENLARGE_RATIO * ENLARGE_RATIO;
             for x in 0..WIDTH {
