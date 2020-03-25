@@ -5,7 +5,7 @@ Chipotle8 is a CHIP-8 Interpreter implemented in Rust, designed for networked pl
 There are many CHIP-8 implementations, so this one differentiates itself by running as a client/server model so those CHIP-8 games which are multiplayer may be played with friends over the Internet. Once I implement networking you will be able to spin this up on a VPC, go to the appropriate URL and join a game lobby while you wait for a friend to join the go to the same URL and begin play.
 
 ## TODO
-- [ ] Implement single player windowed interpreter
+- [x] Implement single player windowed interpreter
 - [ ] Test on non-Ubuntu systems
 - [ ] Implement server networking
 - [ ] Implement client library in Javascript (maybe some WASM thrown in for fun)
