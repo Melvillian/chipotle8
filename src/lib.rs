@@ -26,6 +26,9 @@ const MS_PER_SECOND: u64 = 1000;
 // 1000 / 480 == 2 milliseconds between each update
 pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 
+pub const WIDTH: usize = graphics::WIDTH * graphics::ENLARGE_RATIO;
+pub const HEIGHT: usize = graphics::HEIGHT * graphics::ENLARGE_RATIO;
+
 mod graphics;
 mod keyboard;
 mod op;
@@ -455,8 +458,7 @@ impl Interpreter {
         self.pc += 2;
     }
 
-    /// Draw the 64x32 bit buffer to a Window. We enlarge the 64x32 resolution by ENLARGE_RATIO
-    /// because otherwise the screen is far too small to view
+    /// Draw the 64x32 bit buffer to a Window.
     pub fn draw(&mut self, window: &mut Window) {
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             self.graphics.draw(window);

@@ -4,15 +4,11 @@ use std::io::Error;
 use std::thread;
 use std::time::Duration;
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 32;
-pub const ENLARGE_RATIO: usize = 10; // TODO make this part of interpreter crate
-
 fn main() -> Result<(), Error> {
     let mut window = Window::new(
         "Chip 8 Interpreter (In Rust!)",
-        WIDTH * ENLARGE_RATIO,
-        HEIGHT * ENLARGE_RATIO, // TODO do not hardcode
+        chipotle8::WIDTH,
+        chipotle8::HEIGHT,
         WindowOptions {
             resize: true,
             scale_mode: ScaleMode::UpperLeft,
