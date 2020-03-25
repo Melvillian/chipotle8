@@ -27,24 +27,21 @@ fn main() -> Result<(), Error> {
     )
         .expect("Unable to create window");
 
-    // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(Duration::from_micros(16600)));
+    // Limit to max update rate. This only needs about 60 Hz, which is 16ms
+    window.limit_update_rate(Some(Duration::from_millis(16)));
 
     let mut interpreter = crate::Interpreter::new(None);
 
-    interpreter.initialize("pong.ch8");
+    interpreter.initialize("invaders.ch8");
 
     let mut earlier = Instant::now();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let now = Instant::now();
-        if earlier.elapsed().as_millis() > chipotle8::TIMER_CYCLE_INTERVAL.into() { // this ensures we run at 60 Hz
-            earlier = now;
+        std::thread::sleep(std::time::Duration::from_millis(chipotle8::TIMER_CYCLE_INTERVAL));
 
-            interpreter.cycle();
-            interpreter.handle_key_input(&window);
-            interpreter.draw(&mut window);
-        }
+        interpreter.cycle();
+        interpreter.handle_key_input(&window);
+        interpreter.draw(&mut window);
     }
     Ok(())
 }

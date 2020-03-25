@@ -22,9 +22,9 @@ const GAME_FILE_MEMORY_SIZE: usize =
     MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
-const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
+const CYCLES_PER_SECOND: u128 = 480; // 480 Hz
 const MS_PER_SECOND: u64 = 1000;
-// 1000 / 60 == 16 milliseconds between each update
+// 1000 / 480 == 2 milliseconds between each update
 pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 
 mod graphics;
@@ -337,7 +337,7 @@ impl Interpreter {
 
                 self.v[x as usize] = self.delay_timer.saturating_sub(num_decrement);
             },
-            Op::KeyOpGet(x) => self.keyboard.go_to_blocking_state(x),
+            Op::KeyOpGet(x) => self.keyboard.block(x),
             Op::DelaySet(x) => {
                 self.delay_timer = self.v[x as usize];
                 self.delay_timer_settime = time::Instant::now();
@@ -420,7 +420,7 @@ impl Interpreter {
     /// Given a Window with access to the system keyboard state, update the Interpreter's
     /// keyboard input state
     pub fn handle_key_input(&mut self, window: &Window) {
-        self.handle_key_input_inner(window.get_keys_pressed(KeyRepeat::Yes));
+        self.handle_key_input_inner(window.get_keys());
     }
 
     /// Update the Interpreter state from possible key presses. Should only be called within
@@ -436,7 +436,7 @@ impl Interpreter {
 
             self.keyboard.update_keyboard_with_vec(&key_idxs);
 
-            let (reg_idx, key) = self.keyboard.handle_fx0a_state(keys);
+            let (reg_idx, key) = self.keyboard.handle_fx0a_state(&key_idxs);
             if reg_idx.is_some() && key.is_some() {
                 self.v[reg_idx.unwrap()] = key.unwrap();
             }

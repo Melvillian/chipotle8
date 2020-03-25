@@ -64,12 +64,12 @@ impl Keyboard {
     #[cfg(test)]
     pub fn handle_key_down(&mut self, k: &Key) {
         if let Some(idx) = Self::map_key(k) {
-            self.handle_key_down_inner(idx);
+            self.set_key_down(idx);
         }
     }
 
     /// Handle the key down event for one of the 16 possible keys
-    fn handle_key_down_inner(&mut self, idx: usize) {
+    fn set_key_down(&mut self, idx: usize) {
         if idx <= 0xF {
             self.key_input.put(idx);
         }
@@ -79,12 +79,12 @@ impl Keyboard {
     #[cfg(test)]
     pub fn handle_key_up(&mut self, k: &Key) {
         if let Some(idx) = Self::map_key(k) {
-            self.handle_key_up_inner(idx);
+            self.set_key_up(idx);
         }
     }
 
     /// Handle the key down event for one of the 16 possible keys
-    fn handle_key_up_inner(&mut self, idx: usize) {
+    fn set_key_up(&mut self, idx: usize) {
         if idx <= 0xF {
             self.key_input.set(idx, false);
         }
@@ -92,7 +92,7 @@ impl Keyboard {
 
     /// Given the indices of the keys pressed down on the system keyboard,
     /// fire the appropriate key_up and key_down handlers
-    pub fn update_keyboard_with_vec(&mut self, key_idxs: &Vec<usize>) {
+    pub fn update_keyboard_with_vec(&mut self, key_idxs: &[usize]) {
         let set: HashSet<usize> = HashSet::from_iter(key_idxs.iter().cloned());
 
         // check each of the 16 keys to see which have changed from up to down or vice versa
@@ -101,9 +101,9 @@ impl Keyboard {
             let interpreter_key_is_down = self.get_key_state(i);
 
             if system_key_is_down && !interpreter_key_is_down {
-                self.handle_key_down_inner(i);
+                self.set_key_down(i);
             } else if !system_key_is_down && interpreter_key_is_down {
-                self.handle_key_up_inner(i);
+                self.set_key_up(i);
             }
         }
     }
@@ -115,7 +115,7 @@ impl Keyboard {
 
     /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
     /// the blocking state once a keypress gets detected
-    pub fn go_to_blocking_state(&mut self, reg: u8) {
+    pub fn block(&mut self, reg: u8) {
         self.fx0a_metadata.should_block_on_keypress = true;
         self.fx0a_metadata.register = Some(reg);
     }
@@ -123,7 +123,7 @@ impl Keyboard {
     /// Handle and reset the Interpreter from a key press. Only gets called
     /// when the Interpreter is blocking as a result of a prior FX0A instruction. Return
     /// the index of the key stored earlier
-    pub fn return_from_blocking_state(&mut self) -> usize {
+    pub fn unblock(&mut self) -> usize {
         let reg_idx = self
             .fx0a_metadata
             .register
@@ -134,19 +134,14 @@ impl Keyboard {
 
     /// Checks if we're in a blocking state, and if a valid key has been pressed
     /// transitions out of the blocking state
-    pub fn handle_fx0a_state(&mut self, keys: &Vec<Key>) -> (Option<usize>, Option<u8>) {
+    pub fn handle_fx0a_state(&mut self, key_idxs: &[usize]) -> (Option<usize>, Option<u8>) {
         // check if the FX0A instruction has us in a blocking state and if we can now unblock
         if self.fx0a_metadata.should_block_on_keypress {
-            let key_inputs: Vec<usize> = keys.iter()
-                .map(Self::map_key)
-                .filter(Option::is_some)
-                .map(Option::unwrap)
-                .collect();
 
             // we choose of the first key because we have to choose SOME key, so why not the first?
-            key_inputs.get(0).map(|k| {
-                let reg_idx = self.return_from_blocking_state();
-                (Some(reg_idx), Some(*k as u8))
+            key_idxs.get(0).map(|k| {
+                let reg_idx = self.unblock();
+                return (Some(reg_idx), Some(*k as u8));
             });
         }
         (None, None)
