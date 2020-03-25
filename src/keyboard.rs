@@ -8,11 +8,9 @@ const NUM_KEYS: usize = 16;
 /// Contains the state (up or down) of the CHIP-8's 16 keys, as well as any
 /// state related to keyboard input
 pub struct Keyboard {
-    key_input: FixedBitSet,  // 16 bit hex keyboard input (0-F).
+    key_input: FixedBitSet, // 16 bit hex keyboard input (0-F).
     // Each bit stores the 1 (on) or 0 (off) keypress state
     fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
-
-
 }
 
 impl Keyboard {
@@ -137,7 +135,6 @@ impl Keyboard {
     pub fn handle_fx0a_state(&mut self, key_idxs: &[usize]) -> (Option<usize>, Option<u8>) {
         // check if the FX0A instruction has us in a blocking state and if we can now unblock
         if self.fx0a_metadata.should_block_on_keypress {
-
             // we choose of the first key because we have to choose SOME key, so why not the first?
             key_idxs.get(0).map(|k| {
                 let reg_idx = self.unblock();
@@ -155,7 +152,7 @@ impl Keyboard {
 }
 
 /// Stores data needed to handle instruction FX0A
-#[derive(Default, Debug, PartialEq,)]
+#[derive(Default, Debug, PartialEq)]
 struct FX0AMetadata {
     should_block_on_keypress: bool, // set to true if CPU is waiting on a keypress
     last_key_pressed: Option<Key>,  // once a key is pressed store it here

@@ -2,24 +2,23 @@
 //! as WebAssembly
 use crate::graphics::Graphics;
 use crate::keyboard::Keyboard;
-use minifb::{Key, KeyRepeat, Window};
+use minifb::{Key, Window};
 use op::Op;
 use rand::{thread_rng, Rng};
+use slog::debug;
+use slog::Logger;
+use sloggers::terminal::{Destination, TerminalLoggerBuilder};
+use sloggers::types::Severity;
+use sloggers::Build;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use std::time;
-use slog::{debug, info};
-use sloggers::Build;
-use sloggers::terminal::{TerminalLoggerBuilder, Destination};
-use sloggers::types::Severity;
-use slog::Logger;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
 const STARTING_MEMORY_BYTE: usize = 512;
-const GAME_FILE_MEMORY_SIZE: usize =
-    MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
+const GAME_FILE_MEMORY_SIZE: usize = MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 const CYCLES_PER_SECOND: u128 = 480; // 480 Hz
@@ -28,8 +27,8 @@ const MS_PER_SECOND: u64 = 1000;
 pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 
 mod graphics;
-mod op;
 mod keyboard;
+mod op;
 
 pub struct Interpreter {
     memory: [u8; 4096], // 4k of RAM
@@ -37,10 +36,10 @@ pub struct Interpreter {
     sp: usize, // stack pointer for the 16-level
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
-    stack: [usize; 16], // 16-level stack holding instructions
-    addr: u16, // address instruction register
+    stack: [usize; 16],  // 16-level stack holding instructions
+    addr: u16,           // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
-    pc: usize,     // program counter, 16 bits are needed but we use usize so we can index with it
+    pc: usize, // program counter, 16 bits are needed but we use usize so we can index with it
 
     // 16 8-bit registers. VF is used as a flag by several of the opcodes (see @Op)
     v: [u8; 16],
@@ -49,9 +48,9 @@ pub struct Interpreter {
 
     keyboard: Keyboard, // Stores the state of all keyboard input
 
-    delay_timer: u8,             // 60 Hz timer that can be set and read
+    delay_timer: u8,                    // 60 Hz timer that can be set and read
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
-    sound_timer: u8,             // 60 Hz timer that beeps whenever it is nonzero
+    sound_timer: u8,                    // 60 Hz timer that beeps whenever it is nonzero
     sound_timer_settime: time::Instant, // the instant we last set the sound_timer
     logger: Logger,
 }
@@ -62,15 +61,17 @@ impl Interpreter {
     ///
     /// Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
     /// See http://xion.io/post/code/rust-optional-args.html
-    pub fn new<L : Into<Option<slog::Logger>>>(logger: L) -> Self {
-
+    pub fn new<L: Into<Option<slog::Logger>>>(logger: L) -> Self {
         let log = logger.into().unwrap_or({
             let mut builder = TerminalLoggerBuilder::new();
             builder.level(Severity::Info);
             builder.destination(Destination::Stdout);
             let built_log = builder.build().unwrap();
 
-            debug!(built_log, "no logger given, defaulting to slog's terminal logger");
+            debug!(
+                built_log,
+                "no logger given, defaulting to slog's terminal logger"
+            );
             built_log
         });
         let mut interpreter = Interpreter {
@@ -137,7 +138,7 @@ impl Interpreter {
                 self.graphics.clear();
             }
             Op::Return => {
-                self.sp-=1;
+                self.sp -= 1;
                 self.pc = self.stack[self.sp];
 
                 // zero out the stack for good measure
@@ -150,7 +151,7 @@ impl Interpreter {
             Op::GotoSubRtn(msb, b, lsb) => {
                 // save the current instruction for when the subroutine returns;
                 self.stack[self.sp] = self.pc + 2;
-                self.sp+=1;
+                self.sp += 1;
 
                 // jump to the subroutine
                 self.pc = three_nibbles_to_usize(msb, b, lsb);
@@ -238,7 +239,7 @@ impl Interpreter {
                 let x_reg = self.v[x as usize];
 
                 self.v[0xf] = x_reg & 1; // set VF to the value of the least significant bit
-                self.v[x as usize]>>=1;
+                self.v[x as usize] >>= 1;
             }
             Op::MathVyMinusVx(x, y) => {
                 let x_reg = self.v[x as usize];
@@ -257,7 +258,7 @@ impl Interpreter {
                 let x_reg = self.v[x as usize];
 
                 self.v[0xf] = ((x_reg & 0b10000000) >> 7) & 1; // set VF to the value of the most sig bit
-                self.v[x as usize]<<=1;
+                self.v[x as usize] <<= 1;
             }
             Op::CondVxVyNe(x, y) => {
                 let x_reg = self.v[x as usize];
@@ -327,25 +328,17 @@ impl Interpreter {
                 }
             }
             Op::DelayGet(x) => {
-                // we need to do this more complicated calculation because some time might have
-                // passed since we last set the delay_timer, and so we make up for it by calculating
-                // what the delay_timer would have been had we set it exactly at every 16ms. This
-                // isn't a realtime operating system so we can't guarantee that a cycle gets run on
-                // a timely basis
-                let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
-                let num_decrement = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
-
-                self.v[x as usize] = self.delay_timer.saturating_sub(num_decrement);
-            },
+                self.v[x as usize] = self.get_delay_state();
+            }
             Op::KeyOpGet(x) => self.keyboard.block(x),
             Op::DelaySet(x) => {
                 self.delay_timer = self.v[x as usize];
                 self.delay_timer_settime = time::Instant::now();
-            },
+            }
             Op::SoundSet(x) => {
                 self.sound_timer = self.v[x as usize];
                 self.sound_timer_settime = time::Instant::now();
-            },
+            }
             Op::MemIPlusEqVx(x) => {
                 let reg = self.v[x as usize];
 
@@ -358,7 +351,7 @@ impl Interpreter {
                 } else {
                     self.v[0xF] = 0;
                 }
-            },
+            }
             Op::MemISetSprite(x) => {
                 let reg = self.v[x as usize];
 
@@ -375,7 +368,7 @@ impl Interpreter {
             Op::Bcd(x) => {
                 let reg = self.v[x as usize];
                 let ascii_offset = 48; // we need to subtract 48 because the ascii byte for
-                // "1" is 49, for "2" is 50, ... for "9" is 57
+                                       // "1" is 49, for "2" is 50, ... for "9" is 57
 
                 let decimal_repr = format!("{:03}", reg);
                 let addr_usize = self.addr as usize;
@@ -388,12 +381,12 @@ impl Interpreter {
 
                 let ones_place = decimal_repr.get(2..3).unwrap().as_bytes()[0] - ascii_offset;
                 self.memory[addr_usize + 2 as usize] = ones_place;
-            },
+            }
             Op::RegDump(x) => {
                 for i in 0..x + 1 {
                     self.memory[self.addr as usize + i as usize] = self.v[i as usize];
                 }
-            },
+            }
             Op::RegLoad(x) => {
                 for i in 0..x + 1 {
                     self.v[i as usize] = self.memory[self.addr as usize + i as usize];
@@ -402,8 +395,16 @@ impl Interpreter {
         }
     }
 
+    /// Return the value of the delay timer, accounting for any timer that has passed since
+    /// the timer was last set.
     fn get_delay_state(&self) -> u8 {
-        let ms_since_last_delay_set = (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
+        // we need to do this more complicated calculation because some time might have
+        // passed since we last set the delay_timer, and so we make up for it by calculating
+        // what the delay_timer would have been had we set it exactly at every 16ms. This
+        // isn't a realtime operating system so we can't guarantee that a cycle gets run on
+        // a timely basis
+        let ms_since_last_delay_set =
+            (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
         let num_decrement = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
 
         self.delay_timer.saturating_sub(num_decrement)
@@ -413,7 +414,10 @@ impl Interpreter {
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
-        debug!(self.logger, "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb);
+        debug!(
+            self.logger,
+            "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb
+        );
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
@@ -428,7 +432,8 @@ impl Interpreter {
     /// to create a Window struct, and only have to deal with Option<Vec<Key>>
     fn handle_key_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
         keys_pressed.as_ref().map(|keys| {
-            let key_idxs: Vec<usize> = keys.iter()
+            let key_idxs: Vec<usize> = keys
+                .iter()
                 .map(Keyboard::map_key)
                 .filter(Option::is_some)
                 .map(Option::unwrap)
@@ -447,7 +452,7 @@ impl Interpreter {
     /// by some conditional opcodes
     #[inline]
     fn skip_instruction(&mut self) {
-        self.pc+=2;
+        self.pc += 2;
     }
 
     /// Draw the 64x32 bit buffer to a Window. We enlarge the 64x32 resolution by ENLARGE_RATIO
@@ -456,7 +461,6 @@ impl Interpreter {
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             self.graphics.draw(window);
         }
-
     }
 
     /// step forward one cycle in the interpreter. A cycle consists of:
@@ -464,26 +468,42 @@ impl Interpreter {
     /// 2. decode it
     /// 3. execute it
     pub fn cycle(&mut self) {
-        let msb = self.memory[self.pc];
-        let lsb = self.memory[self.pc + 1];
         let op = self.get_instr_at_pc();
         if !self.keyboard.is_blocking() {
-            debug!(self.logger, "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
-              self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+            debug!(
+                self.logger,
+                "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+                self.sp,
+                self.stack.to_vec(),
+                self.addr,
+                self.pc,
+                self.v.to_vec(),
+                self.delay_timer,
+                self.sound_timer
+            );
 
-                  self.execute(op);
+            self.execute(op);
 
             // advance to the next instruction
             self.prev_op = Some(op);
 
             if Self::should_advance_pc(op) {
-                self.pc+=2;
+                self.pc += 2;
             }
 
             self.decrement_timers_after_cycle();
 
-            debug!(self.logger, "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
-                  self.sp, self.stack.to_vec(), self.addr, self.pc, self.v.to_vec(), self.delay_timer, self.sound_timer);
+            debug!(
+                self.logger,
+                "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+                self.sp,
+                self.stack.to_vec(),
+                self.addr,
+                self.pc,
+                self.v.to_vec(),
+                self.delay_timer,
+                self.sound_timer
+            );
         }
     }
 
@@ -502,7 +522,9 @@ impl Interpreter {
     /// advance the program counter
     fn should_advance_pc(op: Op) -> bool {
         match op {
-            Op::Return | Op::Goto(_, _, _) | Op::GotoSubRtn(_, _, _) | Op::GotoPlusV0(_, _, _) => false,
+            Op::Return | Op::Goto(_, _, _) | Op::GotoSubRtn(_, _, _) | Op::GotoPlusV0(_, _, _) => {
+                false
+            }
             _ => true,
         }
     }
@@ -517,7 +539,10 @@ impl Interpreter {
         self.sp = 0;
         self.pc = STARTING_MEMORY_BYTE;
 
-        debug!(self.logger, "initialized interpreter with game file: {}", path);
+        debug!(
+            self.logger,
+            "initialized interpreter with game file: {}", path
+        );
 
         Ok(())
     }
@@ -588,19 +613,6 @@ fn two_nibbles_to_u8(msb: u8, lsb: u8) -> u8 {
     msb << 4 | lsb
 }
 
-fn two_nibbles_to_usize(msb: u8, lsb: u8) -> usize {
-    two_nibbles_to_u8(msb, lsb) as usize
-}
-
-fn usize_to_two_nibbles(u: usize) -> (u8, u8) {
-    let mask: usize = 0xF;
-
-    let msb = ((u >> 4) & mask) as u8;
-    let lsb = (u & mask) as u8;
-
-    (msb, lsb)
-}
-
 /// Take the msb, middle byte and lsb u8s and merge them into a single 16. Used
 /// to convert three 4-bit pieces of data in memory into a single 16-bit
 /// instruction.
@@ -636,12 +648,6 @@ fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
     ((msb as u16) << 8) | (lsb as u16)
 }
 
-fn u16_to_two_u8s(instr: u16) -> (u8, u8) {
-    let msb = ((instr >> 8) & 0xFF) as u8;
-    let lsb = (instr & 0xFF) as u8;
-    (msb, lsb)
-}
-
 #[cfg(test)]
 pub mod interpreter_tests {
     use super::*;
@@ -660,9 +666,11 @@ pub mod interpreter_tests {
 
             // set some graphics bits to true so we can later see them set to false;
             interpreter.graphics.set(0, 0, true);
-            interpreter
-                .graphics
-                .set((graphics::WIDTH - 1) as u8, (graphics::HEIGHT - 1) as u8, true);
+            interpreter.graphics.set(
+                (graphics::WIDTH - 1) as u8,
+                (graphics::HEIGHT - 1) as u8,
+                true,
+            );
 
             interpreter.execute(op);
 
@@ -682,7 +690,7 @@ pub mod interpreter_tests {
             // address 0x001A
             let arb_addr = 0x001A;
             interpreter.stack[interpreter.sp] = arb_addr;
-            interpreter.sp+=1;
+            interpreter.sp += 1;
             interpreter.pc = 0x090B; // arbitrary position for the program counter
 
             let instr = 0x00EE;
@@ -1175,7 +1183,7 @@ pub mod interpreter_tests {
             // very infrequently, which I can live with.
 
             let mut num_different = 0;
-            let mut new_reg_vals = vec!();
+            let mut new_reg_vals = vec![];
             for _ in 0..10 {
                 interpreter.execute(op);
 
@@ -1184,14 +1192,17 @@ pub mod interpreter_tests {
                 // check to make sure the op is changing (i.e. it's random)
                 if reg_val != prev_byte {
                     // it changed
-                    num_different+=1;
+                    num_different += 1;
                 }
                 new_reg_vals.push((prev_byte, reg_val));
 
                 prev_byte = reg_val;
             }
 
-            assert!(num_different > 5, format!("number_different: {:?}", new_reg_vals));
+            assert!(
+                num_different > 5,
+                format!("number_different: {:?}", new_reg_vals)
+            );
         }
 
         #[test]
@@ -1216,7 +1227,6 @@ pub mod interpreter_tests {
 
             let arb_byte: u8 = 0b10101010;
             for i in 0 as usize..height as usize {
-
                 interpreter.memory[(starting_addr + i) as usize] = arb_byte;
             }
 
@@ -1289,14 +1299,10 @@ pub mod interpreter_tests {
             interpreter.v[x as usize] = 0;
             interpreter.v[y as usize] = (graphics::HEIGHT - 1) as u8;
 
-            let x_reg = interpreter.v[x as usize];
-            let y_reg = interpreter.v[y as usize];
-
             let starting_addr = interpreter.addr as usize;
 
             let arb_byte: u8 = 0b11111111;
             for i in 0 as usize..height as usize {
-
                 interpreter.memory[(starting_addr + i) as usize] = arb_byte;
             }
 
@@ -1308,7 +1314,7 @@ pub mod interpreter_tests {
 
             // we now should have 2 rows worth sprite draw, 1 on the bottommost row and
             // 1 one the top, both starting in the 0th column
-            for y_coord in &[graphics::HEIGHT as u8 -1, 0] {
+            for y_coord in &[graphics::HEIGHT as u8 - 1, 0] {
                 for x_coord in 0..8 {
                     let mut pixel = 0;
                     if ((arb_byte >> (7 - x_coord)) & 1) == 1 {
@@ -1505,7 +1511,7 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, 2);
 
             // fake key presses so we can verify program state resumes after we press some keys
-            interpreter.handle_key_input_inner(Some(vec!(Key::Key1)));
+            interpreter.handle_key_input_inner(Some(vec![Key::Key1]));
 
             interpreter.cycle();
 
@@ -1612,10 +1618,16 @@ pub mod interpreter_tests {
             for i in 0u8..16u8 {
                 if i <= x {
                     // these should have been set from the register values
-                    assert_eq!(interpreter.memory[(interpreter.addr + i as u16) as usize], i);
+                    assert_eq!(
+                        interpreter.memory[(interpreter.addr + i as u16) as usize],
+                        i
+                    );
                 } else {
                     // these should not have changed
-                    assert_eq!(interpreter.memory[(interpreter.addr + i as u16) as usize], 0);
+                    assert_eq!(
+                        interpreter.memory[(interpreter.addr + i as u16) as usize],
+                        0
+                    );
                 }
             }
         }
@@ -1656,10 +1668,6 @@ pub mod interpreter_tests {
         #[test]
         fn timer_dec() {
             let mut interpreter = Interpreter::new(None);
-
-            let instr: usize = 0xFA65;
-            let op = Op::from(instr as u16);
-            let (x, _, _) = usize_to_three_nibbles(instr);
 
             // fake setting timers to non-zero value
             interpreter.delay_timer = 2;

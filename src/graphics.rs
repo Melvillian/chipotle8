@@ -1,6 +1,6 @@
+use minifb::Window;
 /// A wrapper around a 64x32 bit buffer array that abstracts keyboard input and display output
 use std::ops::Index;
-use minifb::Window;
 
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
@@ -28,6 +28,7 @@ impl Graphics {
         &self.buffer
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         return WIDTH * HEIGHT;
     }
@@ -36,7 +37,6 @@ impl Graphics {
     /// index of that bit in the buffer
     #[inline]
     pub fn get_graphics_idx(x: u8, y: u8) -> usize {
-
         let column = x as usize % WIDTH;
         let row = (y as usize % HEIGHT) * WIDTH;
 
@@ -64,9 +64,9 @@ impl Graphics {
         let prev_pix = self.buffer[idx];
 
         if enabled {
-            self.buffer[idx]^=BLACK_RGB;
+            self.buffer[idx] ^= BLACK_RGB;
         } else {
-            self.buffer[idx]^=WHITE_RGB;
+            self.buffer[idx] ^= WHITE_RGB;
         }
 
         prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
@@ -91,7 +91,7 @@ impl Graphics {
             let y_offset = y * WIDTH * ENLARGE_RATIO * ENLARGE_RATIO;
             for x in 0..WIDTH {
                 //if x == 2 { panic!("D");}
-                let buffer_idx = Self::get_graphics_idx(x as u8,y as u8);
+                let buffer_idx = Self::get_graphics_idx(x as u8, y as u8);
                 let pixel = self.buffer()[buffer_idx];
 
                 let x_offset = x * ENLARGE_RATIO;
@@ -111,17 +111,13 @@ impl Graphics {
                     for col_square in 0..ENLARGE_RATIO {
                         let display_idx = (y_offset + row_offset) + (x_offset + col_square);
                         self.display[display_idx] = pixel;
-
                     }
                 }
             }
         }
 
         window
-            .update_with_buffer(
-                &self.display,
-                WIDTH * ENLARGE_RATIO,
-                HEIGHT * ENLARGE_RATIO)
+            .update_with_buffer(&self.display, WIDTH * ENLARGE_RATIO, HEIGHT * ENLARGE_RATIO)
             .unwrap();
     }
 }
