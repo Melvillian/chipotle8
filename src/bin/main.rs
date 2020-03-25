@@ -32,7 +32,7 @@ fn main() -> Result<(), Error> {
 
     let mut interpreter = crate::Interpreter::new(None);
 
-    interpreter.initialize("invaders.ch8");
+    interpreter.initialize("pong.ch8");
 
     let mut earlier = Instant::now();
 
