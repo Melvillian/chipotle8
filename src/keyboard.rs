@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-const NUM_KEYS: usize = 16;
-
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
 /// The recommended key mapping is:
 ///
@@ -38,24 +36,34 @@ pub enum Key {
 }
 
 impl Key {
+    /// Returns a collection of Keys which can be iterated over
     fn variants() -> Vec<Key> {
-        vec![Self::Key1,
+        vec![Self::Key0,
+             Self::Key1,
              Self::Key2,
              Self::Key3,
-             Self::C,
              Self::Key4,
              Self::Key5,
              Self::Key6,
-             Self::D,
              Self::Key7,
              Self::Key8,
              Self::Key9,
-             Self::E,
              Self::A,
-             Self::Key0,
              Self::B,
+             Self::C,
+             Self::D,
+             Self::E,
              Self::F,
         ]
+    }
+}
+
+impl From<u8> for Key {
+    fn from(reg_val: u8) -> Self {
+        match reg_val {
+            v if v <= 0xF => Key::variants()[v as usize],
+            _ => panic!("cannot convert register value {} to Key. value must be < 0xF!", reg_val),
+        }
     }
 }
 /// Contains the state (up or down) of the CHIP-8's 16 keys, as well as any
@@ -66,8 +74,9 @@ pub struct Keyboard {
 }
 
 impl Keyboard {
+    /// Creates a Keyboard with all Keys up and in the unblocking state
     pub fn new() -> Self {
-        let mut key_input: HashMap<Key, bool> = Key::variants()
+        let key_input: HashMap<Key, bool> = Key::variants()
             .iter()
             .map(|k| (*k, false))
             .collect();

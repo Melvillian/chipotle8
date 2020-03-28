@@ -1,8 +1,8 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
 use crate::graphics::Graphics;
-use crate::keyboard::Keyboard;
-use minifb::{Key, Window};
+use crate::keyboard::{Key};
+use minifb::Window as MiniFBWindow;
 use op::Op;
 use rand::{thread_rng, Rng};
 use slog::debug;
@@ -30,11 +30,16 @@ pub const WIDTH: usize = graphics::WIDTH * graphics::ENLARGE_RATIO;
 pub const HEIGHT: usize = graphics::HEIGHT * graphics::ENLARGE_RATIO;
 
 mod graphics;
-mod keyboard;
+pub mod keyboard;
 mod op;
 
 #[cfg(test)]
 mod lib_test;
+
+/// Returns the keys which are currently down on the system keyboard
+pub trait AsKeyboard {
+    fn keys_down(&self) -> Vec<Key>;
+}
 
 pub struct Interpreter {
     memory: [u8; 4096], // 4k of RAM
@@ -52,7 +57,7 @@ pub struct Interpreter {
 
     graphics: Graphics, // 64x32 pixel monochrome screen
 
-    keyboard: Keyboard, // Stores the state of all keyboard input
+    keyboard: crate::keyboard::Keyboard, // Stores the state of all keyboard input
 
     delay_timer: u8,                    // 60 Hz timer that can be set and read
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
@@ -89,7 +94,7 @@ impl Interpreter {
             pc: 0,
             v: [0; 16],
             graphics: Graphics::new(),
-            keyboard: Keyboard::new(),
+            keyboard: crate::keyboard::Keyboard::new(),
             delay_timer: 0,
             delay_timer_settime: time::Instant::now(),
             sound_timer: 0,
@@ -318,7 +323,7 @@ impl Interpreter {
             }
             Op::KeyOpEqVx(x) => {
                 let x_reg = self.v[x as usize];
-                let is_pressed = self.keyboard.get_key_state(x_reg as usize);
+                let is_pressed = self.keyboard.get_key_state(Key::from(x_reg));
 
                 if is_pressed {
                     self.skip_instruction();
@@ -326,7 +331,7 @@ impl Interpreter {
             }
             Op::KeyOpNeVx(x) => {
                 let x_reg = self.v[x as usize];
-                let is_pressed = self.keyboard.get_key_state(x_reg as usize);
+                let is_pressed = self.keyboard.get_key_state(Key::from(x_reg));
 
                 if !is_pressed {
                     self.skip_instruction();
@@ -428,29 +433,20 @@ impl Interpreter {
 
     /// Given a Window with access to the system keyboard state, update the Interpreter's
     /// keyboard input state
-    pub fn handle_key_input(&mut self, window: &Window) {
-        self.handle_key_input_inner(window.get_keys());
+    pub fn handle_key_input(&mut self, keyboard: &impl AsKeyboard) {
+        self.handle_key_input_inner(keyboard.keys_down());
     }
 
     /// Update the Interpreter state from possible key presses. Should only be called within
     /// handle_key_input, which exists so when we're testing handle_key_input_inner we do not need
-    /// to create a Window struct, and only have to deal with Option<Vec<Key>>
-    fn handle_key_input_inner(&mut self, keys_pressed: Option<Vec<Key>>) {
-        keys_pressed.as_ref().map(|keys| {
-            let key_idxs: Vec<usize> = keys
-                .iter()
-                .map(Keyboard::map_key)
-                .filter(Option::is_some)
-                .map(Option::unwrap)
-                .collect();
+    /// to create a Keyboard impl, and only have to deal with Vec<Key>
+    fn handle_key_input_inner(&mut self, keys_down: Vec<Key>) {
+        self.keyboard.update_keyboard_with_vec(&keys_down);
 
-            self.keyboard.update_keyboard_with_vec(&key_idxs);
-
-            let (reg_idx, key) = self.keyboard.handle_fx0a_state(&key_idxs);
-            if reg_idx.is_some() && key.is_some() {
-                self.v[reg_idx.unwrap()] = key.unwrap();
-            }
-        });
+        let (reg_idx, key) = self.keyboard.handle_fx0a_state(&keys_down);
+        if reg_idx.is_some() && key.is_some() {
+            self.v[reg_idx.unwrap()] = key.unwrap();
+        }
     }
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
@@ -460,8 +456,8 @@ impl Interpreter {
         self.pc += 2;
     }
 
-    /// Draw the 64x32 bit buffer to a Window.
-    pub fn draw(&mut self, window: &mut Window) {
+    /// Draw the 64x32 bit buffer to a MiniFBWindow.
+    pub fn draw(&mut self, window: &mut MiniFBWindow) {
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             self.graphics.draw(window);
         }
