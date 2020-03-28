@@ -32,6 +32,8 @@ pub const HEIGHT: usize = graphics::HEIGHT * graphics::ENLARGE_RATIO;
 mod graphics;
 mod keyboard;
 mod op;
+
+#[cfg(test)]
 mod lib_test;
 
 pub struct Interpreter {
@@ -284,7 +286,6 @@ impl Interpreter {
             }
             Op::Rand(x, msb, lsb) => {
                 let random_byte: u8 = thread_rng().gen();
-                // TODO debug this further, current cunch is that it generates 16u8 more than it should
                 let eight_bits = two_nibbles_to_u8(msb, lsb);
 
                 self.v[x as usize] = random_byte & eight_bits;

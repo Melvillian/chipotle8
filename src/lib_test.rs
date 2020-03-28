@@ -536,7 +536,7 @@ pub mod interpreter_tests {
         fn random_op() {
             let mut interpreter = Interpreter::new(None);
 
-            let instr: usize = 0xC012;
+            let instr: usize = 0xC0FF;
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
@@ -551,7 +551,7 @@ pub mod interpreter_tests {
             // very infrequently, which I can live with.
 
             let mut num_different = 0;
-            let mut new_reg_vals = vec![];
+            let mut new_reg_vals = vec![]; // used for printing in case of test failure
             for _ in 0..10 {
                 interpreter.execute(op);
 
