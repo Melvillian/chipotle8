@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 rand = "0.7.3"
-fixedbitset = "0.2.0"
 minifb = "0.15.3"
 slog = "2.5.2"
 sloggers = "0.3.5"
