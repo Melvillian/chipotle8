@@ -23,7 +23,7 @@ fn main() -> Result<(), Error> {
     let mut interpreter = crate::Interpreter::new(None);
 
     // load the game file
-    interpreter.initialize("pong.ch8").unwrap();
+    interpreter.initialize("data/PONG").unwrap();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         thread::sleep(std::time::Duration::from_millis(
