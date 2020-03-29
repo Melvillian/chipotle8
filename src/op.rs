@@ -73,6 +73,17 @@ pub enum Op {
     RegLoad(u8),
 }
 
+impl Op {
+    /// Return true if this op is related to the display. Later we use
+    /// this to decide if we should devote cycles to redrawing the graphics buffer
+    pub fn is_display_op(&self) -> bool {
+        match *self {
+            Op::DispDraw(_, _, _) | Op::DispClear => true,
+            _ => false,
+        }
+    }
+}
+
 impl From<u16> for Op {
     fn from(item: u16) -> Self {
         let mask = 0xF;

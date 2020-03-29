@@ -2,7 +2,6 @@
 //! as WebAssembly
 use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
-use minifb::Window;
 use op::Op;
 use rand::{thread_rng, Rng};
 use slog::debug;
@@ -453,18 +452,21 @@ impl Interpreter {
         self.pc += 2;
     }
 
-    /// Draw the 64x32 bit buffer to a Window.
-    pub fn draw(&mut self, window: &mut Window) {
-        if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
-            self.graphics.draw(window);
-        }
+    /// Returns the display pixels with a resolution of 640x320
+    ///
+    /// TODO: do not hardcode the ENLARGE_RATIO.
+    pub fn get_pixels(&mut self) -> &[u32] {
+        self.graphics.get_pixels()
     }
 
-    /// step forward one cycle in the interpreter. A cycle consists of:
+    /// step forward one cycle in the interpreter. Returns Some(op) if an opcode was executed.
+    /// or None if we're in the blocking state waiting for a keyboard press.
+    ///
+    /// A cycle consists of:
     /// 1. read the instruction at the program counter
     /// 2. decode it
     /// 3. execute it
-    pub fn cycle(&mut self) {
+    pub fn cycle(&mut self) -> Option<Op> {
         let op = self.get_instr_at_pc();
         if !self.keyboard.is_blocking() {
             debug!(
@@ -501,16 +503,10 @@ impl Interpreter {
                 self.delay_timer,
                 self.sound_timer
             );
-        }
-    }
 
-    /// Return true if this op is related to the display. Later we use
-    /// this to decide if we should devote cycles to redrawing the graphics buffer
-    fn is_display_op(op: Op) -> bool {
-        match op {
-            Op::DispDraw(_, _, _) | Op::DispClear => true,
-            _ => false,
+            return Some(op);
         }
+        None
     }
 
     /// Return true if this operation is one of the many Ops for which we should
