@@ -1,8 +1,8 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
 use crate::graphics::Graphics;
-use crate::keyboard::{Key};
-use minifb::Window as MiniFBWindow;
+use crate::keyboard::Key;
+use minifb::Window;
 use op::Op;
 use rand::{thread_rng, Rng};
 use slog::debug;
@@ -13,8 +13,8 @@ use sloggers::Build;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use std::time;
 use std::rc::Rc;
+use std::time;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -434,17 +434,11 @@ impl Interpreter {
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
-    /// Given a Window with access to the system keyboard state, update the Interpreter's
-    /// keyboard input state
+    /// Update the Interpreter keyboard using the state of the system keyboard
     pub fn handle_key_input(&mut self, keyboard: &impl AsKeyboard) {
-        self.handle_key_input_inner(keyboard.keys_down());
-    }
+        let keys_down = keyboard.keys_down();
 
-    /// Update the Interpreter state from possible key presses. Should only be called within
-    /// handle_key_input, which exists so when we're testing handle_key_input_inner we do not need
-    /// to create a Keyboard impl, and only have to deal with Vec<Key>
-    fn handle_key_input_inner(&mut self, keys_down: Vec<Key>) {
-        self.keyboard.update_keyboard_with_vec(&keys_down);
+        self.keyboard.update_keyboard(&keys_down);
 
         let (reg_idx, key) = self.keyboard.handle_fx0a_state(&keys_down);
         if reg_idx.is_some() && key.is_some() {
@@ -459,8 +453,8 @@ impl Interpreter {
         self.pc += 2;
     }
 
-    /// Draw the 64x32 bit buffer to a MiniFBWindow.
-    pub fn draw(&mut self, window: &mut MiniFBWindow) {
+    /// Draw the 64x32 bit buffer to a Window.
+    pub fn draw(&mut self, window: &mut Window) {
         if self.prev_op.is_none() || Self::is_display_op(self.prev_op.unwrap()) {
             self.graphics.draw(window);
         }

@@ -1,7 +1,8 @@
+use slog::debug;
+use slog::Logger;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use slog::{info, Logger};
 use std::rc::Rc;
 
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
@@ -19,43 +20,44 @@ use std::rc::Rc;
 /// +-+-+-+-+             +-+-+-+-+
 #[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
 pub enum Key {
+    Key0,
     Key1,
     Key2,
     Key3,
-    C,
     Key4,
     Key5,
     Key6,
-    D,
     Key7,
     Key8,
     Key9,
-    E,
     A,
-    Key0,
     B,
+    C,
+    D,
+    E,
     F,
 }
 
 impl Key {
     /// Returns a collection of Keys which can be iterated over
     fn variants() -> Vec<Key> {
-        vec![Self::Key0,
-             Self::Key1,
-             Self::Key2,
-             Self::Key3,
-             Self::Key4,
-             Self::Key5,
-             Self::Key6,
-             Self::Key7,
-             Self::Key8,
-             Self::Key9,
-             Self::A,
-             Self::B,
-             Self::C,
-             Self::D,
-             Self::E,
-             Self::F,
+        vec![
+            Self::Key0,
+            Self::Key1,
+            Self::Key2,
+            Self::Key3,
+            Self::Key4,
+            Self::Key5,
+            Self::Key6,
+            Self::Key7,
+            Self::Key8,
+            Self::Key9,
+            Self::A,
+            Self::B,
+            Self::C,
+            Self::D,
+            Self::E,
+            Self::F,
         ]
     }
 }
@@ -64,7 +66,10 @@ impl From<u8> for Key {
     fn from(reg_val: u8) -> Self {
         match reg_val {
             v if v <= 0xF => Key::variants()[v as usize],
-            _ => panic!("cannot convert register value {} to Key. value must be < 0xF!", reg_val),
+            _ => panic!(
+                "cannot convert register value {} to Key. value must be <= 0xF!",
+                reg_val
+            ),
         }
     }
 }
@@ -72,17 +77,14 @@ impl From<u8> for Key {
 /// state related to keyboard input
 pub struct Keyboard {
     key_input: HashMap<Key, bool>, // 16 bit hex keyboard input (0-F). true if pressed otherwise false
-    fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
+    fx0a_metadata: FX0AMetadata,   // used to store state for instruction FX0A,
     logger: Rc<Logger>,
 }
 
 impl Keyboard {
     /// Creates a Keyboard with all Keys up and in the unblocking state
     pub fn new(logger: Rc<Logger>) -> Self {
-        let key_input: HashMap<Key, bool> = Key::variants()
-            .iter()
-            .map(|k| (*k, false))
-            .collect();
+        let key_input: HashMap<Key, bool> = Key::variants().iter().map(|k| (*k, false)).collect();
 
         Keyboard {
             key_input,
@@ -102,7 +104,7 @@ impl Keyboard {
 
     /// Handle the key down event for one of the 16 possible keys
     fn set_key_down(&mut self, k: Key) {
-        info!(self.logger, "key down: {:?}", k);
+        debug!(self.logger, "key down: {:?}", k);
         self.key_input.insert(k, true);
     }
 
@@ -114,13 +116,13 @@ impl Keyboard {
 
     /// Handle the key down event for one of the 16 possible keys
     fn set_key_up(&mut self, k: Key) {
-        info!(self.logger, "key up: {:?}", k);
+        debug!(self.logger, "key up: {:?}", k);
         self.key_input.insert(k, false);
     }
 
-    /// Given the indices of the keys pressed down on the system keyboard,
-    /// fire the appropriate key_up and key_down handlers
-    pub fn update_keyboard_with_vec(&mut self, keys: &[Key]) {
+    /// Given an array of pressed down Keys on the system keyboard,
+    /// fire the appropriate key up and key down functions
+    pub fn update_keyboard(&mut self, keys: &[Key]) {
         let set: HashSet<Key> = HashSet::from_iter(keys.iter().cloned());
 
         // check each of the 16 keys to see which have changed from up to down or vice versa

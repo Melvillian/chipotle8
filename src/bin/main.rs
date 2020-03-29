@@ -1,44 +1,42 @@
-use chipotle8::{Interpreter, AsKeyboard, keyboard::Key};
-use minifb::{Key as MiniFBKey, ScaleMode, Window as MiniFBWIndow, WindowOptions};
+use chipotle8::{keyboard::Key, AsKeyboard, Interpreter};
+use device_query::{DeviceQuery, DeviceState, Keycode};
+use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
 use std::thread;
 use std::time::Duration;
-use device_query::{DeviceQuery, DeviceState, Keycode};
 
-struct Keyboard(DeviceState);
+struct Keyboard(pub DeviceState);
 
 impl AsKeyboard for Keyboard {
-
     fn keys_down(&self) -> Vec<Key> {
-        self.0.get_keys()
+        self.0
+            .get_keys()
             .iter()
-            .filter_map(|key: &Keycode| {
-                match key {
-                    Keycode::Key1 => Some(Key::Key1),
-                    Keycode::Key2 => Some(Key::Key2),
-                    Keycode::Key3 => Some(Key::Key3),
-                    Keycode::Key4 => Some(Key::C),
-                    Keycode::Q => Some(Key::Key4),
-                    Keycode::W => Some(Key::Key5),
-                    Keycode::E => Some(Key::Key6),
-                    Keycode::R => Some(Key::D),
-                    Keycode::A => Some(Key::Key7),
-                    Keycode::S => Some(Key::Key8),
-                    Keycode::D => Some(Key::Key9),
-                    Keycode::F => Some(Key::E),
-                    Keycode::Z => Some(Key::A),
-                    Keycode::X => Some(Key::Key0),
-                    Keycode::C => Some(Key::B),
-                    Keycode::V => Some(Key::F),
-                    _ => None,
-                }
+            .filter_map(|key: &Keycode| match key {
+                Keycode::Key1 => Some(Key::Key1),
+                Keycode::Key2 => Some(Key::Key2),
+                Keycode::Key3 => Some(Key::Key3),
+                Keycode::Key4 => Some(Key::C),
+                Keycode::Q => Some(Key::Key4),
+                Keycode::W => Some(Key::Key5),
+                Keycode::E => Some(Key::Key6),
+                Keycode::R => Some(Key::D),
+                Keycode::A => Some(Key::Key7),
+                Keycode::S => Some(Key::Key8),
+                Keycode::D => Some(Key::Key9),
+                Keycode::F => Some(Key::E),
+                Keycode::Z => Some(Key::A),
+                Keycode::X => Some(Key::Key0),
+                Keycode::C => Some(Key::B),
+                Keycode::V => Some(Key::F),
+                _ => None,
             })
             .collect()
     }
 }
 
 fn main() -> Result<(), Error> {
-    let mut window: MiniFBWIndow = MiniFBWIndow::new(
+    let mut window: Window = Window::new(
         "Chip 8 Interpreter (In Rust!)",
         chipotle8::WIDTH,
         chipotle8::HEIGHT,
@@ -48,7 +46,7 @@ fn main() -> Result<(), Error> {
             ..WindowOptions::default()
         },
     )
-        .expect("Unable to create window");
+    .expect("Unable to create window");
 
     // Limit to max update rate. This only needs about 60 Hz, which is 16ms
     window.limit_update_rate(Some(Duration::from_millis(16)));
@@ -62,7 +60,7 @@ fn main() -> Result<(), Error> {
     let device_state = DeviceState::new();
     let keyboard = Keyboard(device_state);
 
-    while window.is_open() && !window.is_key_down(MiniFBKey::Escape) {
+    while window.is_open() && !keyboard.0.get_keys().contains(&Keycode::Escape) {
         thread::sleep(std::time::Duration::from_millis(
             chipotle8::TIMER_CYCLE_INTERVAL,
         ));

@@ -846,6 +846,14 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.v[x as usize], 40);
         }
 
+        /// Used only for the test below to test AsKeyboard
+        struct Keyboard(Vec<Key>);
+        impl AsKeyboard for Keyboard {
+            fn keys_down(&self) -> Vec<Key> {
+                self.0.clone()
+            }
+        }
+
         #[test]
         fn key_get_block_op() {
             let mut interpreter = Interpreter::new(None);
@@ -878,7 +886,9 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, 2);
 
             // fake key presses so we can verify program state resumes after we press some keys
-            interpreter.handle_key_input_inner(vec![Key::Key1]);
+            let keys = vec![Key::Key1, Key::C];
+            let keyboard = Keyboard(keys);
+            interpreter.handle_key_input(&keyboard);
 
             interpreter.cycle();
 
