@@ -452,9 +452,11 @@ impl Interpreter {
         self.pc += 2;
     }
 
-    /// Returns the display pixels with a resolution of width by height.
+    /// Returns the display pixels with a resolution of 640x320
+    ///
+    /// TODO: do not hardcode the ENLARGE_RATIO.
     pub fn get_pixels(&mut self) -> &[u32] {
-            self.graphics.get_pixels()
+        self.graphics.get_pixels()
     }
 
     /// step forward one cycle in the interpreter. Returns Some(op) if an opcode was executed.

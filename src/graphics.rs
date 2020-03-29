@@ -87,7 +87,6 @@ impl Graphics {
     /// is far too small to view. In the future we will make this performantly
     /// dynamically updateable so users can resize their game windows.
     pub fn get_pixels(&mut self) -> &[u32] {
-
         // TODO: nit: refactor looping logic so that it is more cache friendly. Right now
         // we are jumping ahead in the array too much and thrashing the cache
         for y in 0..HEIGHT {

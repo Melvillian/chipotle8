@@ -1,4 +1,4 @@
-use chipotle8::{AsKeyboard, Interpreter, Key, WIDTH, HEIGHT};
+use chipotle8::{AsKeyboard, Interpreter, Key, HEIGHT, WIDTH};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
@@ -69,9 +69,7 @@ fn main() -> Result<(), Error> {
         if let Some(op) = interpreter.cycle() {
             if op.is_display_op() {
                 let display = interpreter.get_pixels();
-                window
-                    .update_with_buffer(display, WIDTH, HEIGHT)
-                    .unwrap();
+                window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();
             }
         }
 
