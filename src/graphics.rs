@@ -1,6 +1,5 @@
 //! A wrapper around a 64x32 bit buffer array that abstracts the Interpreter's display state
 
-use minifb::Window;
 use std::ops::Index;
 
 pub const WIDTH: usize = 64;
@@ -81,13 +80,16 @@ impl Graphics {
         }
     }
 
-    /// Draw the 64x32 bit buffer to a Window. We enlarge the 64x32 resolution by ENLARGE_RATIO
-    /// because otherwise the screen is far too small to view
-    pub fn draw(&mut self, window: &mut Window) {
-        // TODO don't hardcode window size. Make a Display struct that handles resizing
+    /// Returns the pixels for a 640 x 320 resolution display.
+    ///
+    /// TODO NOTE: Currently we enlarge the base 64x32 resolution by
+    /// ENLARGE_RATIO (currently equals 10) because otherwise the screen
+    /// is far too small to view. In the future we will make this performantly
+    /// dynamically updateable so users can resize their game windows.
+    pub fn get_pixels(&mut self) -> &[u32] {
 
         // TODO: nit: refactor looping logic so that it is more cache friendly. Right now
-        // we are jumping ahead in the array too much and thrashing the lowest level cache.
+        // we are jumping ahead in the array too much and thrashing the cache
         for y in 0..HEIGHT {
             let y_offset = y * WIDTH * ENLARGE_RATIO * ENLARGE_RATIO;
             for x in 0..WIDTH {
@@ -117,9 +119,7 @@ impl Graphics {
             }
         }
 
-        window
-            .update_with_buffer(&self.display, WIDTH * ENLARGE_RATIO, HEIGHT * ENLARGE_RATIO)
-            .unwrap();
+        &self.display
     }
 }
 

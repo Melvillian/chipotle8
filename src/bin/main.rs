@@ -1,4 +1,4 @@
-use chipotle8::{AsKeyboard, Interpreter, Key};
+use chipotle8::{AsKeyboard, Interpreter, Key, WIDTH, HEIGHT};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
@@ -65,9 +65,18 @@ fn main() -> Result<(), Error> {
             chipotle8::TIMER_CYCLE_INTERVAL,
         ));
 
-        interpreter.cycle();
+        // execute the current operation and draw the display if it changed
+        if let Some(op) = interpreter.cycle() {
+            if op.is_display_op() {
+                let display = interpreter.get_pixels();
+                window
+                    .update_with_buffer(display, WIDTH, HEIGHT)
+                    .unwrap();
+            }
+        }
+
+        // check for key press changes and update the Interpreter with which keys are up or down
         interpreter.handle_key_input(&keyboard);
-        interpreter.draw(&mut window);
     }
     Ok(())
 }
