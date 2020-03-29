@@ -8,6 +8,7 @@ use std::rc::Rc;
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
 /// The recommended key mapping, based on the standard CHIP-8 emulator implementation is:
 ///
+/// ```text
 /// Keyboard              Keypad
 /// +-+-+-+-+             +-+-+-+-+
 /// |1|2|3|4|             |1|2|3|C|
@@ -18,6 +19,7 @@ use std::rc::Rc;
 /// +-+-+-+-+             +-+-+-+-+
 /// |Z|X|C|V|             |A|0|B|F|
 /// +-+-+-+-+             +-+-+-+-+
+/// ```
 #[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
 pub enum Key {
     Key0,

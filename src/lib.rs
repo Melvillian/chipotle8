@@ -1,7 +1,7 @@
 //! An implementation of the CHIP 8 emulator in Rust with the intention to be run
 //! as WebAssembly
 use crate::graphics::Graphics;
-use crate::keyboard::Key;
+pub use crate::keyboard::Key;
 use minifb::Window;
 use op::Op;
 use rand::{thread_rng, Rng};
@@ -31,7 +31,7 @@ pub const WIDTH: usize = graphics::WIDTH * graphics::ENLARGE_RATIO;
 pub const HEIGHT: usize = graphics::HEIGHT * graphics::ENLARGE_RATIO;
 
 mod graphics;
-pub mod keyboard;
+mod keyboard;
 mod op;
 
 #[cfg(test)]

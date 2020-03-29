@@ -1,4 +1,4 @@
-use chipotle8::{keyboard::Key, AsKeyboard, Interpreter};
+use chipotle8::{AsKeyboard, Interpreter, Key};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
