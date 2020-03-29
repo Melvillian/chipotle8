@@ -17,18 +17,18 @@ impl AsKeyboard for Keyboard {
                 Keycode::Key2 => Some(Key::Key2),
                 Keycode::Key3 => Some(Key::Key3),
                 Keycode::Key4 => Some(Key::C),
-                Keycode::Q => Some(Key::Key4),
-                Keycode::W => Some(Key::Key5),
-                Keycode::E => Some(Key::Key6),
-                Keycode::R => Some(Key::D),
-                Keycode::A => Some(Key::Key7),
-                Keycode::S => Some(Key::Key8),
-                Keycode::D => Some(Key::Key9),
-                Keycode::F => Some(Key::E),
-                Keycode::Z => Some(Key::A),
-                Keycode::X => Some(Key::Key0),
-                Keycode::C => Some(Key::B),
-                Keycode::V => Some(Key::F),
+                Keycode::Q    => Some(Key::Key4),
+                Keycode::W    => Some(Key::Key5),
+                Keycode::E    => Some(Key::Key6),
+                Keycode::R    => Some(Key::D),
+                Keycode::A    => Some(Key::Key7),
+                Keycode::S    => Some(Key::Key8),
+                Keycode::D    => Some(Key::Key9),
+                Keycode::F    => Some(Key::E),
+                Keycode::Z    => Some(Key::A),
+                Keycode::X    => Some(Key::Key0),
+                Keycode::C    => Some(Key::B),
+                Keycode::V    => Some(Key::F),
                 _ => None,
             })
             .collect()
@@ -51,10 +51,8 @@ fn main() -> Result<(), Error> {
     // Limit to max update rate. This only needs about 60 Hz, which is 16ms
     window.limit_update_rate(Some(Duration::from_millis(16)));
 
-    let mut interpreter = crate::Interpreter::new(None);
-
-    // load the game file
-    interpreter.initialize("data/PONG").unwrap();
+    // create the interpreter and load the pong game file
+    let mut interpreter = crate::Interpreter::with_game_file(None, "data/PONG")?;
 
     // setup keyboard
     let device_state = DeviceState::new();
