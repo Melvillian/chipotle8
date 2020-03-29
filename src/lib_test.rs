@@ -22,7 +22,6 @@ pub mod interpreter_tests {
 
     mod execute {
         use super::*;
-        use minifb::Key;
 
         #[test]
         fn display_clear_op() {
@@ -749,14 +748,14 @@ pub mod interpreter_tests {
             let instr: usize = 0xE09E;
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
-            let x_reg = interpreter.v[x as usize] as usize;
+            let x_reg = interpreter.v[x as usize];
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down and up the key in reg
-            interpreter.keyboard.handle_key_down(&Key::Key1);
-            interpreter.keyboard.handle_key_up(&Key::Key1);
+            interpreter.keyboard.handle_key_down(Key::Key1);
+            interpreter.keyboard.handle_key_up(Key::Key1);
             interpreter.execute(op);
 
             assert_eq!(interpreter.pc, 0);
@@ -770,16 +769,16 @@ pub mod interpreter_tests {
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.v[x as usize] = 1; // setup x register for keypress
-            let x_reg = interpreter.v[x as usize] as usize;
+            let x_reg = interpreter.v[x as usize];
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.keyboard.handle_key_down(&Key::Key1);
+            interpreter.keyboard.handle_key_down(Key::Key1);
             interpreter.execute(op);
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), true);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), true);
             assert_eq!(interpreter.pc, 2);
         }
 
@@ -790,9 +789,9 @@ pub mod interpreter_tests {
             let instr: usize = 0xE0A1;
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
-            let x_reg = interpreter.v[x as usize] as usize;
+            let x_reg = interpreter.v[x as usize];
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), false);
             assert_eq!(interpreter.pc, 0);
 
             interpreter.execute(op);
@@ -808,16 +807,16 @@ pub mod interpreter_tests {
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
             interpreter.v[x as usize] = 1; // setup x register for keypress
-            let x_reg = interpreter.v[x as usize] as usize;
+            let x_reg = interpreter.v[x as usize];
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), false);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), false);
             assert_eq!(interpreter.pc, 0);
 
             // fake pressing down the key in reg
-            interpreter.keyboard.handle_key_down(&Key::Key1);
+            interpreter.keyboard.handle_key_down(Key::Key1);
             interpreter.execute(op);
 
-            assert_eq!(interpreter.keyboard.get_key_state(x_reg), true);
+            assert_eq!(interpreter.keyboard.get_key_state(x_reg.into()), true);
             assert_eq!(interpreter.pc, 0);
         }
 
@@ -879,7 +878,7 @@ pub mod interpreter_tests {
             assert_eq!(interpreter.pc, 2);
 
             // fake key presses so we can verify program state resumes after we press some keys
-            interpreter.handle_key_input_inner(Some(vec![Key::Key1]));
+            interpreter.handle_key_input_inner(vec![Key::Key1]);
 
             interpreter.cycle();
 
