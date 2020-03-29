@@ -1,21 +1,23 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use slog::{info, Logger};
+use std::rc::Rc;
 
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
-/// The recommended key mapping is:
+/// The recommended key mapping, based on the standard CHIP-8 emulator implementation is:
 ///
-/// Keypad                   Keyboard
-/// +-+-+-+-+                +-+-+-+-+
-/// |1|2|3|C|                |1|2|3|4|
-/// +-+-+-+-+                +-+-+-+-+
-/// |4|5|6|D|                |Q|W|E|R|
-/// +-+-+-+-+       =>       +-+-+-+-+
-/// |7|8|9|E|                |A|S|D|F|
-/// +-+-+-+-+                +-+-+-+-+
-/// |A|0|B|F|                |Z|X|C|V|
-/// +-+-+-+-+                +-+-+-+-+
-#[derive(Eq, PartialEq, Hash, Clone, Copy)]
+/// Keyboard              Keypad
+/// +-+-+-+-+             +-+-+-+-+
+/// |1|2|3|4|             |1|2|3|C|
+/// +-+-+-+-+             +-+-+-+-+
+/// |Q|W|E|R|             |4|5|6|D|
+/// +-+-+-+-+      =>     +-+-+-+-+
+/// |A|S|D|F|             |7|8|9|E|
+/// +-+-+-+-+             +-+-+-+-+
+/// |Z|X|C|V|             |A|0|B|F|
+/// +-+-+-+-+             +-+-+-+-+
+#[derive(Eq, PartialEq, Hash, Clone, Copy, Debug)]
 pub enum Key {
     Key1,
     Key2,
@@ -71,11 +73,12 @@ impl From<u8> for Key {
 pub struct Keyboard {
     key_input: HashMap<Key, bool>, // 16 bit hex keyboard input (0-F). true if pressed otherwise false
     fx0a_metadata: FX0AMetadata, // used to store state for instruction FX0A,
+    logger: Rc<Logger>,
 }
 
 impl Keyboard {
     /// Creates a Keyboard with all Keys up and in the unblocking state
-    pub fn new() -> Self {
+    pub fn new(logger: Rc<Logger>) -> Self {
         let key_input: HashMap<Key, bool> = Key::variants()
             .iter()
             .map(|k| (*k, false))
@@ -83,6 +86,7 @@ impl Keyboard {
 
         Keyboard {
             key_input,
+            logger: logger,
             fx0a_metadata: FX0AMetadata {
                 should_block_on_keypress: false,
                 register: None,
@@ -98,6 +102,7 @@ impl Keyboard {
 
     /// Handle the key down event for one of the 16 possible keys
     fn set_key_down(&mut self, k: Key) {
+        info!(self.logger, "key down: {:?}", k);
         self.key_input.insert(k, true);
     }
 
@@ -109,6 +114,7 @@ impl Keyboard {
 
     /// Handle the key down event for one of the 16 possible keys
     fn set_key_up(&mut self, k: Key) {
+        info!(self.logger, "key up: {:?}", k);
         self.key_input.insert(k, false);
     }
 

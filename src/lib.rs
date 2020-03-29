@@ -14,6 +14,7 @@ use std::fs::File;
 use std::io::Error;
 use std::io::Read;
 use std::time;
+use std::rc::Rc;
 
 const MEMORY_SIZE: usize = 4096;
 const DISPLAY_REFRESH_SIZE: usize = 256;
@@ -63,7 +64,7 @@ pub struct Interpreter {
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
     sound_timer: u8,                    // 60 Hz timer that beeps whenever it is nonzero
     sound_timer_settime: time::Instant, // the instant we last set the sound_timer
-    logger: Logger,
+    logger: Rc<Logger>,
 }
 
 impl Interpreter {
@@ -85,6 +86,8 @@ impl Interpreter {
             );
             built_log
         });
+        let log = Rc::new(log);
+
         let mut interpreter = Interpreter {
             memory: [0; 4096],
             sp: 0,
@@ -94,12 +97,12 @@ impl Interpreter {
             pc: 0,
             v: [0; 16],
             graphics: Graphics::new(),
-            keyboard: crate::keyboard::Keyboard::new(),
+            keyboard: crate::keyboard::Keyboard::new(log.clone()),
             delay_timer: 0,
             delay_timer_settime: time::Instant::now(),
             sound_timer: 0,
             sound_timer_settime: time::Instant::now(),
-            logger: log,
+            logger: log.clone(),
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter

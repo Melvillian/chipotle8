@@ -3,24 +3,34 @@ use minifb::{Key as MiniFBKey, ScaleMode, Window as MiniFBWIndow, WindowOptions}
 use std::io::Error;
 use std::thread;
 use std::time::Duration;
-use std::convert::From;
+use device_query::{DeviceQuery, DeviceState, Keycode};
 
-struct Keyboard(MiniFBWIndow);
+struct Keyboard(DeviceState);
 
 impl AsKeyboard for Keyboard {
 
     fn keys_down(&self) -> Vec<Key> {
         self.0.get_keys()
-            .unwrap()
             .iter()
-            .filter_map(|mini_key: &MiniFBKey| {
-                let key_integer = *mini_key as u32;
-
-                let number_of_hex_digits = 16;
-                if key_integer < number_of_hex_digits { // only the hexadecimal keys 0 - F
-                    Some(Key::from(key_integer as u8))
-                } else {
-                    None
+            .filter_map(|key: &Keycode| {
+                match key {
+                    Keycode::Key1 => Some(Key::Key1),
+                    Keycode::Key2 => Some(Key::Key2),
+                    Keycode::Key3 => Some(Key::Key3),
+                    Keycode::Key4 => Some(Key::C),
+                    Keycode::Q => Some(Key::Key4),
+                    Keycode::W => Some(Key::Key5),
+                    Keycode::E => Some(Key::Key6),
+                    Keycode::R => Some(Key::D),
+                    Keycode::A => Some(Key::Key7),
+                    Keycode::S => Some(Key::Key8),
+                    Keycode::D => Some(Key::Key9),
+                    Keycode::F => Some(Key::E),
+                    Keycode::Z => Some(Key::A),
+                    Keycode::X => Some(Key::Key0),
+                    Keycode::C => Some(Key::B),
+                    Keycode::V => Some(Key::F),
+                    _ => None,
                 }
             })
             .collect()
@@ -28,20 +38,6 @@ impl AsKeyboard for Keyboard {
 }
 
 fn main() -> Result<(), Error> {
-    let window_keyboard: MiniFBWIndow = MiniFBWIndow::new(
-        "Chip 8 Interpreter (In Rust!)",
-        chipotle8::WIDTH,
-        chipotle8::HEIGHT,
-        WindowOptions {
-            resize: true,
-            scale_mode: ScaleMode::UpperLeft,
-            ..WindowOptions::default()
-        },
-    )
-    .expect("Unable to create window");
-
-    let keyboard = Keyboard(window_keyboard);
-
     let mut window: MiniFBWIndow = MiniFBWIndow::new(
         "Chip 8 Interpreter (In Rust!)",
         chipotle8::WIDTH,
@@ -61,6 +57,10 @@ fn main() -> Result<(), Error> {
 
     // load the game file
     interpreter.initialize("data/PONG").unwrap();
+
+    // setup keyboard
+    let device_state = DeviceState::new();
+    let keyboard = Keyboard(device_state);
 
     while window.is_open() && !window.is_key_down(MiniFBKey::Escape) {
         thread::sleep(std::time::Duration::from_millis(
