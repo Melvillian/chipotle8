@@ -1,5 +1,6 @@
+//! A wrapper around a 64x32 bit buffer array that abstracts the Interpreter's display state
+
 use minifb::Window;
-/// A wrapper around a 64x32 bit buffer array that abstracts keyboard input and display output
 use std::ops::Index;
 
 pub const WIDTH: usize = 64;
