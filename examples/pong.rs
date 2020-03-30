@@ -52,7 +52,7 @@ fn main() -> Result<(), Error> {
     window.limit_update_rate(Some(Duration::from_millis(16)));
 
     // create the interpreter and load the pong game file
-    let mut interpreter = crate::Interpreter::with_game_file(None, "data/PONG")?;
+    let mut interpreter = crate::Interpreter::with_game_file("data/PONG")?;
 
     // setup keyboard
     let device_state = DeviceState::new();
