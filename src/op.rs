@@ -1,4 +1,7 @@
-/// 35 CHIP 8 op codes. The u8's are guaranteed to be between 0x0 and 0xF
+/// 35 CHIP 8 op codes. The u8's are guaranteed to be between 0x0 and 0xF.
+///
+/// See [the CHIP-8 Wikipedia page](https://en.wikipedia.org/wiki/CHIP-8#Opcode_table) for details
+/// on each opcode.
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Op {
     // 0XXX
@@ -76,6 +79,17 @@ pub enum Op {
 impl Op {
     /// Return true if this op is related to the display. Later we use
     /// this to decide if we should devote cycles to redrawing the graphics buffer
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use chipotle8::Op;
+    ///
+    /// let op = Op::DispDraw(0x0, 0x0, 0x0);
+    /// assert_eq!(op.is_display_op(), true);
+    ///
+    /// let op = Op::Goto(0x0, 0x0, 0x0);
+    /// assert_eq!(op.is_display_op(), false);
     pub fn is_display_op(&self) -> bool {
         match *self {
             Op::DispDraw(_, _, _) | Op::DispClear => true,

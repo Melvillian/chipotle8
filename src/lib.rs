@@ -1,8 +1,101 @@
-//! An implementation of the CHIP 8 emulator in Rust with the intention to be run
-//! as WebAssembly
+//! A CHIP-8 interpreter that you can be used as a library in your Rust programs.
+//!
+//! `chipotle8` lets you play retro classics like Pong with the keyboard and window
+//! crates of your choice. In the example below we choose to use the
+//! [`minifb`](https://crates.io/crates/minifb) and [`device_query`](https://crates.io/crates/device_query)
+//! crates for window and keyboard management, respectively, but you can select any you like.
+//!
+//! In order for `chipotle8` to understand which system keyboard keys are pressed down
+//! you will need to implement the [`AsKeyboard`](trait.AsKeyboard.html) trait's
+//! [`keys_down`](trait.AsKeyboard.html#tymethod.keys_down) method which should return
+//! a [`Vec`](https://doc.rust-lang.org/nightly/alloc/vec/struct.Vec.html)`<`[`Key`](enum.Key.html)`>`
+//! representing the system keys that are currently pressed down.
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use chipotle8::{AsKeyboard, Interpreter, Key, HEIGHT, WIDTH};
+//! use device_query::{DeviceQuery, DeviceState, Keycode};
+//! use minifb::{ScaleMode, Window, WindowOptions};
+//! use std::io::Error;
+//! use std::thread;
+//! use std::time::Duration;
+//!
+//! struct Keyboard(pub DeviceState);
+//!
+//! impl AsKeyboard for Keyboard {
+//!     fn keys_down(&self) -> Vec<Key> {
+//!         self.0
+//!             .get_keys()
+//!             .iter()
+//!             .filter_map(|key: &Keycode| match key {
+//!                 Keycode::Key1 => Some(Key::Key1),
+//!                 Keycode::Key2 => Some(Key::Key2),
+//!                 Keycode::Key3 => Some(Key::Key3),
+//!                 Keycode::Key4 => Some(Key::C),
+//!                 Keycode::Q    => Some(Key::Key4),
+//!                 Keycode::W    => Some(Key::Key5),
+//!                 Keycode::E    => Some(Key::Key6),
+//!                 Keycode::R    => Some(Key::D),
+//!                 Keycode::A    => Some(Key::Key7),
+//!                 Keycode::S    => Some(Key::Key8),
+//!                 Keycode::D    => Some(Key::Key9),
+//!                 Keycode::F    => Some(Key::E),
+//!                 Keycode::Z    => Some(Key::A),
+//!                 Keycode::X    => Some(Key::Key0),
+//!                 Keycode::C    => Some(Key::B),
+//!                 Keycode::V    => Some(Key::F),
+//!                 _ => None,
+//!             })
+//!             .collect()
+//!     }
+//! }
+//! fn main() -> Result<(), Error> {
+//!     let mut window: Window = Window::new(
+//!         "Chip 8 Interpreter (In Rust!)",
+//!         chipotle8::WIDTH,
+//!         chipotle8::HEIGHT,
+//!         WindowOptions {
+//!             resize: true,
+//!             scale_mode: ScaleMode::UpperLeft,
+//!             ..WindowOptions::default()
+//!         },
+//!     )
+//!     .expect("Unable to create window");
+//!
+//!     // Limit to max update rate. This only needs about 60 Hz, which is 16ms
+//!     window.limit_update_rate(Some(Duration::from_millis(16)));
+//!
+//!     // create the interpreter and load the pong game file
+//!     let mut interpreter = crate::Interpreter::with_game_file("data/PONG")?;
+//!
+//!     // setup keyboard
+//!     let device_state = DeviceState::new();
+//!     let keyboard = Keyboard(device_state);
+//!
+//!     while window.is_open() && !keyboard.0.get_keys().contains(&Keycode::Escape) {
+//!         thread::sleep(std::time::Duration::from_millis(
+//!             chipotle8::TIMER_CYCLE_INTERVAL,
+//!         ));
+//!
+//!         // execute the current operation and draw the display if it changed
+//!         if let Some(op) = interpreter.cycle() {
+//!             if op.is_display_op() {
+//!                 let display = interpreter.get_pixels();
+//!                 window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();
+//!             }
+//!         }
+//!
+//!         // check for key press changes and update the Interpreter with which keys are up or down
+//!         interpreter.handle_key_input(&keyboard);
+//!     }
+//!     Ok(())
+//! }
+//!
+//! ```
 use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
-use op::Op;
+pub use op::Op;
 use rand::{thread_rng, Rng};
 use slog::debug;
 use slog::Logger;
@@ -24,9 +117,13 @@ const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 const CYCLES_PER_SECOND: u128 = 480; // 480 Hz
 const MS_PER_SECOND: u64 = 1000;
 // 1000 / 480 == 2 milliseconds between each update
+/// 2 milliseconds between each cycle. Warning: using a different interval will result in undefined
+/// behavior.
 pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 
+/// The width of the pixel resolution, currently 640
 pub const WIDTH: usize = graphics::WIDTH * graphics::ENLARGE_RATIO;
+/// the height of the pixel resolution, currently 320
 pub const HEIGHT: usize = graphics::HEIGHT * graphics::ENLARGE_RATIO;
 
 mod graphics;
@@ -36,11 +133,65 @@ mod op;
 #[cfg(test)]
 mod lib_test;
 
-/// Returns the keys which are currently down on the system keyboard
+/// A trait for interfacing the user's chosen keyboard crate with `chipotle8`'s hexadecimal keyboard
+///
+/// # Examples
+///
+/// ```no_run
+/// use chipotle8::{AsKeyboard, Key};
+/// use device_query::{DeviceQuery, DeviceState, Keycode};
+///
+/// struct Keyboard(pub DeviceState);
+///
+/// impl AsKeyboard for Keyboard {
+///     fn keys_down(&self) -> Vec<Key> {
+///         self.0
+///             .get_keys()
+///             .iter()
+///             .filter_map(|key: &Keycode| match key {
+///                 Keycode::Key1 => Some(Key::Key1),
+///                 Keycode::Key2 => Some(Key::Key2),
+///                 Keycode::Key3 => Some(Key::Key3),
+///                 Keycode::Key4 => Some(Key::C),
+///                 Keycode::Q    => Some(Key::Key4),
+///                 Keycode::W    => Some(Key::Key5),
+///                 Keycode::E    => Some(Key::Key6),
+///                 Keycode::R    => Some(Key::D),
+///                 Keycode::A    => Some(Key::Key7),
+///                 Keycode::S    => Some(Key::Key8),
+///                 Keycode::D    => Some(Key::Key9),
+///                 Keycode::F    => Some(Key::E),
+///                 Keycode::Z    => Some(Key::A),
+///                 Keycode::X    => Some(Key::Key0),
+///                 Keycode::C    => Some(Key::B),
+///                 Keycode::V    => Some(Key::F),
+///                 _ => None,
+///             })
+///             .collect()
+///     }
+/// }
 pub trait AsKeyboard {
+    /// Returns A Vec of [`Key`](enum.Key.html)s which are currently down on the system keyboard. See
+    /// [`Key`](enum.Key.html) for the suggested mapping for a QWERTY keyboard to CHIP-8's hexadecimal
+    /// keyboard.
     fn keys_down(&self) -> Vec<Key>;
 }
 
+/// Stores the registers, memory, timers, and any other data necessary to run the interpreter.
+///
+/// # Examples
+///
+/// ```no_run
+/// # use std::io::Error;
+/// # use chipotle8::Interpreter;
+/// # fn main() -> Result<(), Error> {
+/// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+///
+/// // execute the first two instructions of the `PONG` game
+/// interpreter.cycle();
+/// interpreter.cycle();
+/// #    Ok(())
+/// # }
 pub struct Interpreter {
     memory: [u8; 4096], // 4k of RAM
 
@@ -71,8 +222,8 @@ impl Interpreter {
     /// called on it to load in the game file.
     ///
     /// Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
-    /// See http://xion.io/post/code/rust-optional-args.html
-    pub fn new<L: Into<Option<slog::Logger>>>(logger: L) -> Self {
+    /// See http://xion.io/post/code/rust-optional-args.html.
+    fn new<L: Into<Option<slog::Logger>>>(logger: L) -> Self {
         let log = logger.into().unwrap_or({
             let mut builder = TerminalLoggerBuilder::new();
             builder.level(Severity::Info);
@@ -105,7 +256,7 @@ impl Interpreter {
         };
 
         // The first 512 bytes of memory were originally used to store the interpreter
-        // code itself, but since we are writing an emulator and don't need to store
+        // code itself, but since we are writing an interpreter and don't need to store
         // interpreter code in the interpreter's memory those bytes are free for us to
         // put whatever we want there. So we put the font data there.
         let font_set: [[u8; NUM_BYTES_IN_FONT_CHAR as usize]; 16] = [
@@ -138,8 +289,51 @@ impl Interpreter {
         interpreter
     }
 
-    pub fn get_logger(&self) -> &Logger {
-        &self.logger
+    /// Creates an Interpreter with a path to a CHIP-8 game file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::io::Error;
+    /// # use chipotle8::Interpreter;
+    /// # fn main() -> Result<(), Error> {
+    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///
+    /// # Ok(())
+    /// # }
+    pub fn with_game_file(
+        path_to_game_file: &str,
+    ) -> Result<Self, Error> {
+        Self::with_game_file_and_logger(path_to_game_file, None)
+    }
+
+    /// Creates an Interpreter with a path to a CHIP-8 game file and an optional logger.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::io::Error;
+    /// # use chipotle8::Interpreter;
+    /// # fn main() -> Result<(), Error> {
+    /// let mut interpreter = Interpreter::with_game_file_and_logger("data/PONG", None)?;
+    ///
+    /// # Ok(())
+    /// # }
+
+    pub fn with_game_file_and_logger<L: Into<Option<slog::Logger>>>(
+        path_to_game_file: &str,
+        logger: L,
+    ) -> Result<Self, Error> {
+        // Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
+        // See http://xion.io/post/code/rust-optional-args.html
+
+        let mut interpreter = Interpreter::new(logger);
+        let res = interpreter.initialize(path_to_game_file);
+        if res.is_ok() {
+            Ok(interpreter)
+        } else {
+            Err(res.err().unwrap())
+        }
     }
 
     /// Update the state of the interpreter by running the operation
@@ -422,7 +616,7 @@ impl Interpreter {
         self.delay_timer.saturating_sub(num_decrement)
     }
 
-    /// Return the decoded Op at the current program counter. Does not increment the program counter
+    /// Return the decoded Op at the current program counter. Does not increment the program counter.
     fn get_instr_at_pc(&self) -> Op {
         let msb = self.memory[self.pc];
         let lsb = self.memory[self.pc + 1];
@@ -433,7 +627,32 @@ impl Interpreter {
         Op::from(two_u8s_to_u16(msb, lsb))
     }
 
-    /// Update the Interpreter keyboard using the state of the system keyboard
+    /// Update the Interpreter keyboard using the state of the system keyboard.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::io::Error;
+    /// # use chipotle8::{Interpreter, AsKeyboard, Key};
+    /// use device_query::{DeviceQuery, DeviceState, Keycode};
+    ///
+    /// struct Keyboard(pub DeviceState);
+    ///
+    /// impl AsKeyboard for Keyboard {
+    ///     fn keys_down(&self) -> Vec<Key> {
+    ///         // TODO: if this weren't an example we'd actually implement this!
+    ///         vec![Key::Key1]
+    ///     }
+    /// }
+    ///
+    /// fn main() -> Result<(), Error> {
+    ///     let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///
+    ///     let keyboard = Keyboard(DeviceState::new());
+    ///
+    ///     interpreter.handle_key_input(&keyboard);
+    ///     Ok(())
+    /// }
     pub fn handle_key_input(&mut self, keyboard: &impl AsKeyboard) {
         let keys_down = keyboard.keys_down();
 
@@ -446,15 +665,26 @@ impl Interpreter {
     }
 
     /// Skip executing the next instruction by incrementing the program counter 2 bytes. Used
-    /// by some conditional opcodes
+    /// by some conditional opcodes.
     #[inline]
     fn skip_instruction(&mut self) {
         self.pc += 2;
     }
 
-    /// Returns the display pixels with a resolution of 640x320
+    /// Returns the display pixels with a resolution of 640x320.
     ///
-    /// TODO: do not hardcode the ENLARGE_RATIO.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::io::Error;
+    /// # use chipotle8::Interpreter;
+    /// # fn main() -> Result<(), Error> {
+    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///
+    /// // this will return a slice 640x320 of all 0's,
+    /// let display = interpreter.get_pixels();
+    /// #    Ok(())
+    /// # }
     pub fn get_pixels(&mut self) -> &[u32] {
         self.graphics.get_pixels()
     }
@@ -466,6 +696,22 @@ impl Interpreter {
     /// 1. read the instruction at the program counter
     /// 2. decode it
     /// 3. execute it
+    /// 4. possibly advance the program counter
+    /// 5. decrement the sound and delay timers
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use std::io::Error;
+    /// # use chipotle8::Interpreter;
+    /// # fn main() -> Result<(), Error> {
+    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///
+    /// // execute the first two instructions of the `PONG` game
+    /// interpreter.cycle();
+    /// interpreter.cycle();
+    /// #    Ok(())
+    /// # }
     pub fn cycle(&mut self) -> Option<Op> {
         let op = self.get_instr_at_pc();
         if !self.keyboard.is_blocking() {
@@ -525,7 +771,7 @@ impl Interpreter {
     /// Read in a game file and initialize the necessary registers.
     ///
     /// Returns an error if we fail to open the game file
-    pub fn initialize(&mut self, path: &str) -> Result<(), Error> {
+    fn initialize(&mut self, path: &str) -> Result<(), Error> {
         let game_file = File::open(path).unwrap();
 
         self.read_game_file(game_file)?;

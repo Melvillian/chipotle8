@@ -6,7 +6,7 @@ use std::iter::FromIterator;
 use std::rc::Rc;
 
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
-/// The recommended key mapping, based on the standard CHIP-8 emulator implementation is:
+/// The recommended key mapping, based on the standard CHIP-8 interpreter implementation is:
 ///
 /// ```text
 /// Keyboard              Keypad

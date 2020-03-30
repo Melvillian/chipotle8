@@ -11,12 +11,15 @@ There are many CHIP-8 implementations, so this one differentiates itself by runn
 - [ ] Implement client library in Javascript (maybe some WASM thrown in for fun)
 - [ ] Play first networked Pong game!
 
-## Install
-`$> cargo build && cargo test`
-
 ## Usage
-Run the following command 
-`$> cargo run /path/to/chip8/game_file`
+```
+# Cargo.toml
+[dependencies]
+chipotle8 = { git = "https://github.com/Melvillian/chipotle8" }
+```
+
+## Example
+`$> cargo run --example pong`
 
 ## Acknowledgements
 The following guides and developers have been very helpful in inspiring me to learn about interpreters/emulators
