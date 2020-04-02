@@ -3,7 +3,7 @@ use slog::Logger;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
 /// The recommended key mapping, based on the standard CHIP-8 interpreter implementation is:
@@ -80,12 +80,12 @@ impl From<u8> for Key {
 pub struct Keyboard {
     key_input: HashMap<Key, bool>, // 16 bit hex keyboard input (0-F). true if pressed otherwise false
     fx0a_metadata: FX0AMetadata,   // used to store state for instruction FX0A,
-    logger: Rc<Logger>,
+    logger: Arc<Logger>,
 }
 
 impl Keyboard {
     /// Creates a Keyboard with all Keys up and in the unblocking state
-    pub fn new(logger: Rc<Logger>) -> Self {
+    pub fn new(logger: Arc<Logger>) -> Self {
         let key_input: HashMap<Key, bool> = Key::variants().iter().map(|k| (*k, false)).collect();
 
         Keyboard {

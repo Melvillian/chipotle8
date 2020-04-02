@@ -105,7 +105,7 @@ use sloggers::Build;
 use std::fs::File;
 use std::io::Error;
 use std::io::Read;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time;
 
 const MEMORY_SIZE: usize = 4096;
@@ -214,7 +214,7 @@ pub struct Interpreter {
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
     sound_timer: u8,                    // 60 Hz timer that beeps whenever it is nonzero
     sound_timer_settime: time::Instant, // the instant we last set the sound_timer
-    logger: Rc<Logger>,
+    logger: Arc<Logger>,
 }
 
 impl Interpreter {
@@ -236,7 +236,7 @@ impl Interpreter {
             );
             built_log
         });
-        let log = Rc::new(log);
+        let log = Arc::new(log);
 
         let mut interpreter = Interpreter {
             memory: [0; 4096],
