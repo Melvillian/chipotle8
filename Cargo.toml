@@ -9,7 +9,9 @@ license = "MIT"
 
 [dependencies]
 rand = "0.7.3"
-minifb = "0.15.3"
-device_query = "0.2.3"
 slog = "2.5.2"
 sloggers = "0.3.5"
+
+[dev-dependencies]
+minifb = "0.15.3"
+device_query = "0.2.3"
