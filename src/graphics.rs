@@ -7,7 +7,7 @@ pub const HEIGHT: usize = 32;
 pub const ENLARGE_RATIO: usize = 10;
 
 const BLACK_RGB: u32 = 0x00FF_FFFF;
-const WHITE_RGB: u32 = 0x0000_0000;
+const WHITE_RGB: u32 = 0x00000000;
 
 pub struct Graphics {
     buffer: [u32; WIDTH * HEIGHT],
