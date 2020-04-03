@@ -90,7 +90,7 @@ impl Keyboard {
 
         Keyboard {
             key_input,
-            logger: logger,
+            logger,
             fx0a_metadata: FX0AMetadata {
                 should_block_on_keypress: false,
                 register: None,
@@ -173,7 +173,7 @@ impl Keyboard {
             // we choose of the first key because we have to choose SOME key, so why not the first?
             keys.get(0).map(|k: &Key| {
                 let reg_idx = self.unblock();
-                return (Some(reg_idx), Some(*k));
+                (Some(reg_idx), Some(*k))
             });
         }
         (None, None)
