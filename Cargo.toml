@@ -15,3 +15,4 @@ sloggers = "0.3.5"
 [dev-dependencies]
 minifb = "0.15.3"
 device_query = "0.2.3"
+rusty-hook = "^0.10.3"

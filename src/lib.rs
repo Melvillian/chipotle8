@@ -93,6 +93,9 @@
 //! }
 //!
 //! ```
+
+#![warn(clippy::all)]
+
 use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
 pub use op::Op;
@@ -301,9 +304,7 @@ impl Interpreter {
     ///
     /// # Ok(())
     /// # }
-    pub fn with_game_file(
-        path_to_game_file: &str,
-    ) -> Result<Self, Error> {
+    pub fn with_game_file(path_to_game_file: &str) -> Result<Self, Error> {
         Self::with_game_file_and_logger(path_to_game_file, None)
     }
 
@@ -464,7 +465,7 @@ impl Interpreter {
             Op::BitOpLftShift(x) => {
                 let x_reg = self.v[x as usize];
 
-                self.v[0xf] = ((x_reg & 0b10000000) >> 7) & 1; // set VF to the value of the most sig bit
+                self.v[0xf] = ((x_reg & 0b1000_0000) >> 7) & 1; // set VF to the value of the most sig bit
                 self.v[x as usize] <<= 1;
             }
             Op::CondVxVyNe(x, y) => {
@@ -574,7 +575,7 @@ impl Interpreter {
             Op::Bcd(x) => {
                 let reg = self.v[x as usize];
                 let ascii_offset = 48; // we need to subtract 48 because the ascii byte for
-                                       // "1" is 49, for "2" is 50, ... for "9" is 57
+                                       // "0" is 48, for "1" is 49, ... for "9" is 57
 
                 let decimal_repr = format!("{:03}", reg);
                 let addr_usize = self.addr as usize;
@@ -589,12 +590,14 @@ impl Interpreter {
                 self.memory[addr_usize + 2 as usize] = ones_place;
             }
             Op::RegDump(x) => {
-                for i in 0..x + 1 {
+                for i in 0..=x {
+                    // the spec says the range in inclusive, so we do =x
                     self.memory[self.addr as usize + i as usize] = self.v[i as usize];
                 }
             }
             Op::RegLoad(x) => {
-                for i in 0..x + 1 {
+                for i in 0..=x {
+                    // the spec says the range in inclusive, so we do =x
                     self.v[i as usize] = self.memory[self.addr as usize + i as usize];
                 }
             }
@@ -658,9 +661,9 @@ impl Interpreter {
 
         self.keyboard.update_keyboard(&keys_down);
 
-        let (reg_idx, key) = self.keyboard.handle_fx0a_state(&keys_down);
-        if reg_idx.is_some() && key.is_some() {
-            self.v[reg_idx.unwrap()] = key.unwrap();
+        let (reg_idx_option, key_option) = self.keyboard.handle_fx0a_state(&keys_down);
+        if let (Some(reg_idx), Some(key)) = (reg_idx_option, key_option) {
+            self.v[reg_idx] = key;
         }
     }
 
@@ -790,7 +793,7 @@ impl Interpreter {
     fn read_game_file(&mut self, file: File) -> Result<(), Error> {
         let buf = read_file_to_vec(file)?;
 
-        let err_msg = format!("file is too large");
+        let err_msg = "file is too large".to_string();
         assert!(buf.len() < GAME_FILE_MEMORY_SIZE, err_msg);
 
         let game_file_range = STARTING_MEMORY_BYTE..(STARTING_MEMORY_BYTE + buf.len());
