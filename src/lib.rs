@@ -301,9 +301,7 @@ impl Interpreter {
     ///
     /// # Ok(())
     /// # }
-    pub fn with_game_file(
-        path_to_game_file: &str,
-    ) -> Result<Self, Error> {
+    pub fn with_game_file(path_to_game_file: &str) -> Result<Self, Error> {
         Self::with_game_file_and_logger(path_to_game_file, None)
     }
 
