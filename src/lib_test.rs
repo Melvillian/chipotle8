@@ -1096,7 +1096,5 @@ pub mod interpreter_tests {
 
         let expected: u16 = 0x0FA;
         assert_eq!(expected, three_nibbles_to_u16(n1, n2, n3));
-
-        assert_eq!(true, false);
     }
 }
