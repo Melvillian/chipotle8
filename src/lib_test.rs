@@ -838,9 +838,10 @@ pub mod interpreter_tests {
 
             assert_eq!(interpreter.v[x as usize], 42);
 
-            // now wait 2 cycles worth of time, and make sure the value we get reflects the fact
-            // that time has passed
+            // now wait 2 cycles worth of time (plus a little bit more so we don't have flaky tests), 
+            // and make sure the value we get reflects the fact that time has passed
             std::thread::sleep(std::time::Duration::from_millis(2 * TIMER_CYCLE_INTERVAL));
+            std::thread::sleep(std::time::Duration::from_micros(100));
             interpreter.execute(op);
 
             assert_eq!(interpreter.v[x as usize], 40);
@@ -1095,7 +1096,5 @@ pub mod interpreter_tests {
 
         let expected: u16 = 0x0FA;
         assert_eq!(expected, three_nibbles_to_u16(n1, n2, n3));
-
-        assert_eq!(true, false);
     }
 }
