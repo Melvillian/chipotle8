@@ -90,8 +90,8 @@ impl Op {
     ///
     /// let op = Op::Goto(0x0, 0x0, 0x0);
     /// assert_eq!(op.is_display_op(), false);
-    pub fn is_display_op(&self) -> bool {
-        match *self {
+    pub fn is_display_op(self) -> bool {
+        match self {
             Op::DispDraw(_, _, _) | Op::DispClear => true,
             _ => false,
         }
