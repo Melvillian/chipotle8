@@ -30,7 +30,7 @@ impl Graphics {
 
     #[cfg(test)]
     pub fn len(&self) -> usize {
-        WIDTH * HEIGHT
+        return (WIDTH * HEIGHT);
     }
 
     /// Given x (column) and y (row) coordinates for a bit in the buffer, return the corresponding

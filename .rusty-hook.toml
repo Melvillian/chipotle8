@@ -1,5 +1,5 @@
 [hooks]
-pre-push = "cargo fmt && cargo clippy -- -D warnings && cargo clippy"
+pre-push = "cargo fmt && cargo clippy -- -D warnings && cargo test"
 
 [logging]
 verbose = true
