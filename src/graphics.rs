@@ -22,6 +22,7 @@ const MAX_CHANGES_SIZE: usize = 5_000;
 /// which is much more performant than returning ALL of the pixel changes through
 /// [`get_pixels`](function.get_pixels.html)
 #[derive(Clone, PartialEq, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DisplayChange {
     x: usize,
     y: usize,
