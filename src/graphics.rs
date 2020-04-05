@@ -5,6 +5,7 @@ use std::ops::Index;
 pub const WIDTH: usize = 64;
 pub const HEIGHT: usize = 32;
 pub const ENLARGE_RATIO: usize = 10;
+use serde::Serialize;
 
 const BLACK_RGB: u32 = 0x00FF_FFFF;
 const WHITE_RGB: u32 = 0x0000_0000;
@@ -20,7 +21,7 @@ const MAX_CHANGES_SIZE: usize = 5_000;
 /// With DisplayChange we can return only those pixel which changed to the user, 
 /// which is much more performant than returning ALL of the pixel changes through
 /// [`get_pixels`](function.get_pixels.html)
-#[derive(Clone, PartialEq, Debug, Default)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize)]
 pub struct DisplayChange {
     x: usize,
     y: usize,

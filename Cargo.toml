@@ -11,6 +11,8 @@ license = "MIT"
 rand = "0.7.3"
 slog = "2.5.2"
 sloggers = "0.3.5"
+serde = { version = "1.0.105", features = ["derive"] }
+serde_json = "1.0.51"
 
 [dev-dependencies]
 minifb = "0.15.3"
