@@ -32,8 +32,8 @@ pub mod interpreter_tests {
             let op = Op::from(instr);
 
             // set some graphics bits to true so we can later see them set to false;
-            interpreter.graphics.set(0, 0, true);
-            interpreter.graphics.set(
+            interpreter.graphics.xor_set(0, 0, true);
+            interpreter.graphics.xor_set(
                 (graphics::WIDTH - 1) as u8,
                 (graphics::HEIGHT - 1) as u8,
                 true,
@@ -266,13 +266,13 @@ pub mod interpreter_tests {
             let x_usize = x as usize;
             let y_usize = y as usize;
 
-            interpreter.v[x_usize] = 0b11001100;
-            interpreter.v[y_usize] = 0b00110011;
+            interpreter.v[x_usize] = 0b1100_1100;
+            interpreter.v[y_usize] = 0b0011_0011;
 
             interpreter.execute(op);
 
-            assert_eq!(interpreter.v[x_usize], 0b11111111);
-            assert_eq!(interpreter.v[y_usize], 0b00110011)
+            assert_eq!(interpreter.v[x_usize], 0b1111_1111);
+            assert_eq!(interpreter.v[y_usize], 0b0011_0011)
         }
 
         #[test]

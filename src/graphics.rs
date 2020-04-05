@@ -9,18 +9,42 @@ pub const ENLARGE_RATIO: usize = 10;
 const BLACK_RGB: u32 = 0x00FF_FFFF;
 const WHITE_RGB: u32 = 0x0000_0000;
 
+/// The max size the Graphic's `changes` `Vec` can grow until we set it to be empty.
+/// We need this because without periodically trimming it `changes` will grow unbounded
+/// and we'll run out of memory. Ideally `changes` never grows this large because
+/// a user will be calling `flush_changes` in a tight loop. This length is large
+/// enough for about 5 seconds of Pong at 2ms per cycle before we need to empty it.
+const MAX_CHANGES_SIZE: usize = 5_000;
+
+/// Holds the coordinates and state of a recently changed pixel in the display.
+/// With DisplayChange we can return only those pixel which changed to the user, 
+/// which is much more performant than returning ALL of the pixel changes through
+/// [`get_pixels`](function.get_pixels.html)
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct DisplayChange {
+    x: usize,
+    y: usize,
+    is_alive: bool,
+}
+
 pub struct Graphics {
+    // the 64x32 bitmap
     buffer: [u32; WIDTH * HEIGHT],
+
+    // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
+    // bitmap to an ENLARGE_RATIO-by-ENLARGE_RATIO bitmap of the same color
     display: Vec<u32>,
+
+    // A collection of all the pixel display changes since we last reset the changes
+    changes: Vec<DisplayChange>
 }
 
 impl Graphics {
     pub fn new() -> Self {
         Graphics {
             buffer: [0; WIDTH * HEIGHT],
-            // our 64x32 bitmap is very small, so let's enlarge it by mapping ever pixel of our
-            // bitmap to an ENLARGE_RATIO-by-ENLARGE_RATIO bitmap of the same color
             display: vec![0; (ENLARGE_RATIO * WIDTH) * (ENLARGE_RATIO * HEIGHT)],
+            changes: vec![],
         }
     }
 
@@ -43,18 +67,6 @@ impl Graphics {
         column + row
     }
 
-    /// Set the given pixel to black if enabled equals true, and to white otherwise
-    #[inline]
-    #[cfg(test)]
-    pub fn set(&mut self, x: u8, y: u8, enabled: bool) {
-        let idx = Self::get_graphics_idx(x, y);
-        if enabled {
-            self.buffer[idx] = BLACK_RGB;
-        } else {
-            self.buffer[idx] = WHITE_RGB;
-        }
-    }
-
     /// Set the given pixel at `idx` to the XOR of the current pixel at `idx` and black if `enable`
     /// equals true or white if `enable` equals false. Returns true if the pixel was unset
     #[inline]
@@ -69,7 +81,19 @@ impl Graphics {
             self.buffer[idx] ^= WHITE_RGB;
         }
 
+        // we keep a running collection of recent changes to the display, so we must update it
+        self.add_change(DisplayChange { x: x as usize, y: y as usize, is_alive: enabled });
+
         prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
+    }
+
+    /// Add a new DisplayChange to `changes`, and shrink `changes` if it's too large
+    fn add_change(&mut self, change: DisplayChange) {
+        if self.changes.len() == MAX_CHANGES_SIZE {
+            self.changes.resize(0, DisplayChange::default());
+        }
+
+        self.changes.push(change);
     }
 
     /// set all pixels to white (0)
@@ -120,6 +144,15 @@ impl Graphics {
 
         &self.display
     }
+
+    /// Returns the recent changes to the display and reset `changes` to be empty
+    #[allow(dead_code)]
+    pub fn flush_changes(&mut self) -> Vec<DisplayChange> {
+        let changes = self.changes.clone();
+        self.changes.resize(0, DisplayChange::default());
+
+        changes
+    }
 }
 
 impl Index<usize> for Graphics {
@@ -128,5 +161,30 @@ impl Index<usize> for Graphics {
     #[inline]
     fn index(&self, bit: usize) -> &Self::Output {
         &self.buffer[bit]
+    }
+}
+
+#[cfg(test)]
+pub mod graphics_tests {
+    use super::*;
+
+    #[test]
+    fn changes() {
+        let mut g = Graphics::new();
+        
+        // artificially set some pixels so we can xor_set them later
+        g.xor_set(0, 0, true);
+        g.xor_set(0, 1, false);
+        g.xor_set(1, 0, false);
+
+        assert_eq!(g.changes, vec![
+            DisplayChange { x: 0, y: 0, is_alive: true }, 
+            DisplayChange { x: 0, y: 1, is_alive: false },
+            DisplayChange { x: 1, y: 0, is_alive: false },
+        ]);
+
+        g.flush_changes();
+
+        assert_eq!(g.changes, vec![]);
     }
 }
