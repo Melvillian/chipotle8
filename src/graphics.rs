@@ -18,7 +18,7 @@ const WHITE_RGB: u32 = 0x0000_0000;
 const MAX_CHANGES_SIZE: usize = 5_000;
 
 /// Holds the coordinates and state of a recently changed pixel in the display.
-/// With DisplayChange we can return only those pixel which changed to the user, 
+/// With DisplayChange we can return only those pixel which changed to the user,
 /// which is much more performant than returning ALL of the pixel changes through
 /// [`get_pixels`](function.get_pixels.html)
 #[derive(Clone, PartialEq, Debug, Default, Serialize)]
@@ -37,7 +37,7 @@ pub struct Graphics {
     display: Vec<u32>,
 
     // A collection of all the pixel display changes since we last reset the changes
-    changes: Vec<DisplayChange>
+    changes: Vec<DisplayChange>,
 }
 
 impl Graphics {
@@ -83,7 +83,11 @@ impl Graphics {
         }
 
         // we keep a running collection of recent changes to the display, so we must update it
-        self.add_change(DisplayChange { x: x as usize, y: y as usize, is_alive: enabled });
+        self.add_change(DisplayChange {
+            x: x as usize,
+            y: y as usize,
+            is_alive: enabled,
+        });
 
         prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
     }
@@ -172,17 +176,32 @@ pub mod graphics_tests {
     #[test]
     fn changes() {
         let mut g = Graphics::new();
-        
+
         // artificially set some pixels so we can xor_set them later
         g.xor_set(0, 0, true);
         g.xor_set(0, 1, false);
         g.xor_set(1, 0, false);
 
-        assert_eq!(g.changes, vec![
-            DisplayChange { x: 0, y: 0, is_alive: true }, 
-            DisplayChange { x: 0, y: 1, is_alive: false },
-            DisplayChange { x: 1, y: 0, is_alive: false },
-        ]);
+        assert_eq!(
+            g.changes,
+            vec![
+                DisplayChange {
+                    x: 0,
+                    y: 0,
+                    is_alive: true
+                },
+                DisplayChange {
+                    x: 0,
+                    y: 1,
+                    is_alive: false
+                },
+                DisplayChange {
+                    x: 1,
+                    y: 0,
+                    is_alive: false
+                },
+            ]
+        );
 
         g.flush_changes();
 
