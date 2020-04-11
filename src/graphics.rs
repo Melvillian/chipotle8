@@ -78,9 +78,9 @@ impl Graphics {
         let prev_pix = self.buffer[idx];
 
         if enabled {
-            self.buffer[idx] ^= BLACK_RGB;
-        } else {
             self.buffer[idx] ^= WHITE_RGB;
+        } else {
+            self.buffer[idx] ^= BLACK_RGB;
         }
 
         // we keep a running collection of recent changes to the display, so we must update it
@@ -90,7 +90,7 @@ impl Graphics {
             is_alive: enabled,
         });
 
-        prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
+        prev_pix == WHITE_RGB && self.buffer[idx] == BLACK_RGB
     }
 
     /// Add a new DisplayChange to `changes`, and shrink `changes` if it's too large
@@ -102,11 +102,11 @@ impl Graphics {
         self.changes.push(change);
     }
 
-    /// set all pixels to white (0)
+    /// set all pixels to black
     #[inline]
     pub fn clear(&mut self) {
         for i in 0..self.buffer.len() {
-            self.buffer[i] = 0;
+            self.buffer[i] = BLACK_RGB;
         }
     }
 
