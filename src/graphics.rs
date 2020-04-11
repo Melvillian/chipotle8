@@ -7,8 +7,8 @@ pub const HEIGHT: usize = 32;
 pub const ENLARGE_RATIO: usize = 10;
 use serde::Serialize;
 
-const BLACK_RGB: u32 = 0x00FF_FFFF;
-const WHITE_RGB: u32 = 0x0000_0000;
+const WHITE_RGB: u32 = 0x00FF_FFFF;
+const BLACK_RGB: u32 = 0x0000_0000;
 
 /// The max size the Graphic's `changes` `Vec` can grow until we set it to be empty.
 /// We need this because without periodically trimming it `changes` will grow unbounded
@@ -85,8 +85,8 @@ impl Graphics {
 
         // we keep a running collection of recent changes to the display, so we must update it
         self.add_change(DisplayChange {
-            x: x as usize,
-            y: y as usize,
+            x: x as usize % WIDTH,
+            y: y as usize % HEIGHT,
             is_alive: enabled,
         });
 
@@ -151,8 +151,7 @@ impl Graphics {
         &self.display
     }
 
-    /// Returns the recent changes to the display and reset `changes` to be empty
-    #[allow(dead_code)]
+    /// Flushes the recent changes to the interpreter's display and returns them
     pub fn flush_changes(&mut self) -> Vec<DisplayChange> {
         let changes = self.changes.clone();
         self.changes.resize(0, DisplayChange::default());

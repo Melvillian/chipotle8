@@ -97,6 +97,7 @@
 #![warn(clippy::all)]
 
 use crate::graphics::Graphics;
+pub use crate::graphics::DisplayChange;
 pub use crate::keyboard::Key;
 pub use op::Op;
 use rand::{thread_rng, Rng};
@@ -831,6 +832,25 @@ impl Interpreter {
             self.sound_timer = self.sound_timer.saturating_sub(1);
             self.sound_timer_settime = time::Instant::now();
         }
+    }
+
+    /// Flushes the recent changes to the interpreter's display and returns them
+    /// 
+    /// # Examples
+    /// ```no_run
+    /// # use std::io::Error;
+    /// # use chipotle8::{Interpreter, DisplayChange};
+    /// # fn main() -> Result<(), Error> {
+    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///
+    /// let changes: Vec<DisplayChange> = interpreter.flush_changes();
+    /// // update your app's own display with these recent changes to the interpreter's display
+    /// // ...
+    /// #    Ok(())
+    /// # }
+    #[allow(dead_code)]
+    pub fn flush_changes(&mut self) -> Vec<DisplayChange> {
+        self.graphics.flush_changes()
     }
 }
 
