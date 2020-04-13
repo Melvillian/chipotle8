@@ -183,6 +183,9 @@ pub trait AsKeyboard {
 
 type Address = u16;
 
+// Rust doesn't have a 4-bit numeric type, so we waste 4 bits by storing nibbles in a u8. Oh well!
+type Nibble = u8;
+
 /// Stores the registers, memory, timers, and any other data necessary to run the interpreter.
 ///
 /// # Examples
@@ -205,7 +208,7 @@ pub struct Interpreter {
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
     stack: [usize; 16],  // 16-level stack holding instructions
-    addr: u16,           // address instruction register
+    addr: Address,           // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize, // program counter, 16 bits are needed but we use usize so we can index with it
 
@@ -480,11 +483,11 @@ impl Interpreter {
                 }
             }
             Op::MemSetI(msb, b, lsb) => {
-                let addr = three_nibbles_to_u16(msb, b, lsb);
+                let addr = three_nibbles_to_address(msb, b, lsb);
                 self.addr = addr;
             }
             Op::GotoPlusV0(msb, b, lsb) => {
-                let addr = three_nibbles_to_u16(msb, b, lsb);
+                let addr = three_nibbles_to_address(msb, b, lsb);
                 let v0_reg = self.v[0];
 
                 self.pc = addr as usize + v0_reg as usize;
@@ -573,7 +576,7 @@ impl Interpreter {
 
                 let font_idx = (FONT_DATA_START as u8) + (least_nibble * NUM_BYTES_IN_FONT_CHAR);
 
-                self.addr = font_idx as u16;
+                self.addr = font_idx as Address;
             }
             Op::Bcd(x) => {
                 let reg = self.v[x as usize];
@@ -630,7 +633,7 @@ impl Interpreter {
             self.logger,
             "get_instr_at_pc: (msb: {:X?}, lsb: {:X?})", msb, lsb
         );
-        Op::from(two_u8s_to_u16(msb, lsb))
+        Op::from(two_u8s_to_address(msb, lsb))
     }
 
     /// Update the Interpreter keyboard using the state of the system keyboard.
@@ -864,31 +867,23 @@ fn read_file_to_vec(mut file: File) -> Result<Vec<u8>, Error> {
     Ok(buf)
 }
 
-/// Take the msb and lsb u8s and merge them into a single 16. Used
-/// to convert two 8-bit pieces of data in memory into a single 16-bit
-/// instruction.
-#[cfg(test)]
-fn two_nibbles_to_u16(msb: u8, lsb: u8) -> u16 {
-    two_nibbles_to_u8(msb, lsb) as u16
-}
-
-fn two_nibbles_to_u8(msb: u8, lsb: u8) -> u8 {
+fn two_nibbles_to_u8(msb: Nibble, lsb: Nibble) -> u8 {
     assert!(msb <= 0xF && lsb <= 0xF, "msb: {}, lsb: {}", msb, lsb);
     msb << 4 | lsb
 }
 
-/// Take the msb, middle byte and lsb u8s and merge them into a single 16. Used
+/// Take the msb, middle byte and lsb Nibbles and merge them into a single Address. Used
 /// to convert three 4-bit pieces of data in memory into a single 16-bit
 /// instruction.
-fn three_nibbles_to_u16(msb: u8, b: u8, lsb: u8) -> u16 {
+fn three_nibbles_to_address(msb: Nibble, b: Nibble, lsb: Nibble) -> Address {
     let mask = 0xF;
-    ((msb as u16 & mask) << 8) | ((b as u16 & mask) << 4) | (lsb as u16 & mask)
+    ((msb as Address & mask) << 8) | ((b as Address & mask) << 4) | (lsb as Address & mask)
 }
 
-fn three_nibbles_to_usize(msb: u8, b: u8, lsb: u8) -> usize {
-    three_nibbles_to_u16(msb, b, lsb) as usize
+fn three_nibbles_to_usize(msb: Nibble, b: Nibble, lsb: Nibble) -> usize {
+    three_nibbles_to_address(msb, b, lsb) as usize
 }
 
-fn two_u8s_to_u16(msb: u8, lsb: u8) -> u16 {
-    ((msb as u16) << 8) | (lsb as u16)
+fn two_u8s_to_address(msb: u8, lsb: u8) -> Address {
+    ((msb as Address) << 8) | (lsb as Address)
 }

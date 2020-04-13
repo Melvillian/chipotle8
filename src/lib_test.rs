@@ -504,7 +504,7 @@ pub mod interpreter_tests {
             let instr: usize = 0xA012;
             let op = Op::from(instr as u16);
             let (msb, b, lsb) = usize_to_three_nibbles(instr);
-            let addr = three_nibbles_to_u16(msb, b, lsb);
+            let addr = three_nibbles_to_address(msb, b, lsb);
 
             assert_eq!(interpreter.addr, 0);
 
@@ -520,7 +520,7 @@ pub mod interpreter_tests {
             let instr: usize = 0xB012;
             let op = Op::from(instr as u16);
             let (msb, b, lsb) = usize_to_three_nibbles(instr);
-            let addr = three_nibbles_to_u16(msb, b, lsb);
+            let addr = three_nibbles_to_address(msb, b, lsb);
 
             interpreter.v[0] = 42;
 
@@ -1080,21 +1080,12 @@ pub mod interpreter_tests {
     }
 
     #[test]
-    fn two_u8s_to_16_test() {
-        let n1 = 0x0;
-        let n2 = 0xF;
-
-        let expected: u16 = 0x0F;
-        assert_eq!(expected, two_nibbles_to_u16(n1, n2));
-    }
-
-    #[test]
-    fn three_u8s_to_16_test() {
+    fn three_u8s_to_address_test() {
         let n1 = 0x0;
         let n2 = 0xF;
         let n3 = 0xA;
 
         let expected: u16 = 0x0FA;
-        assert_eq!(expected, three_nibbles_to_u16(n1, n2, n3));
+        assert_eq!(expected, three_nibbles_to_address(n1, n2, n3));
     }
 }

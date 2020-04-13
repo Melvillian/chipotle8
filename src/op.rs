@@ -1,4 +1,7 @@
-/// 35 CHIP 8 op codes. The u8's are guaranteed to be between 0x0 and 0xF.
+// Rust doesn't have a 4-bit numeric type, so we waste 4 bits by storing nibbles in a Nibble. Oh well!
+type Nibble = u8;
+
+/// 35 CHIP 8 op codes. The Nibble's are guaranteed to be between 0x0 and 0xF.
 ///
 /// See [the CHIP-8 Wikipedia page](https://en.wikipedia.org/wiki/CHIP-8#Opcode_table) for details
 /// on each opcode.
@@ -6,7 +9,7 @@
 pub enum Op {
     // 0XXX
     // 0NNN 	Call 		Calls RCA 1802 program at address NNN. Not necessary for most ROMs.
-    CallRca(u8, u8, u8),
+    CallRca(Nibble, Nibble, Nibble),
     // 00E0 	Display 	disp_clear() 	Clears the screen.
     DispClear,
     // 00EE 	Flow 	return; 	Returns from a subroutine.
@@ -14,66 +17,66 @@ pub enum Op {
 
     // 1XXX
     // 1NNN 	Flow 	goto NNN; 	Jumps to address NNN.
-    Goto(u8, u8, u8),
+    Goto(Nibble, Nibble, Nibble),
 
     // 2XXX
-    GotoSubRtn(u8, u8, u8),
+    GotoSubRtn(Nibble, Nibble, Nibble),
 
     // 3XXX
-    CondVxEq(u8, u8, u8),
+    CondVxEq(Nibble, Nibble, Nibble),
 
     // 4XXX
-    CondVxNe(u8, u8, u8),
+    CondVxNe(Nibble, Nibble, Nibble),
 
     // 5XXX
-    CondVxVyEq(u8, u8),
+    CondVxVyEq(Nibble, Nibble),
 
     // 6XXX
-    ConstSetVx(u8, u8, u8),
+    ConstSetVx(Nibble, Nibble, Nibble),
 
     // 7XXX
-    ConstAddVx(u8, u8, u8),
+    ConstAddVx(Nibble, Nibble, Nibble),
 
     // 8XXX
-    AssignVyToVx(u8, u8),
-    BitOpOr(u8, u8),
-    BitOpAnd(u8, u8),
-    BitOpXor(u8, u8),
-    MathVxAddVy(u8, u8),
-    MathVxMinusVy(u8, u8),
-    BitOpRtShift(u8),
-    MathVyMinusVx(u8, u8),
-    BitOpLftShift(u8),
+    AssignVyToVx(Nibble, Nibble),
+    BitOpOr(Nibble, Nibble),
+    BitOpAnd(Nibble, Nibble),
+    BitOpXor(Nibble, Nibble),
+    MathVxAddVy(Nibble, Nibble),
+    MathVxMinusVy(Nibble, Nibble),
+    BitOpRtShift(Nibble),
+    MathVyMinusVx(Nibble, Nibble),
+    BitOpLftShift(Nibble),
 
     // 9XXX
-    CondVxVyNe(u8, u8),
+    CondVxVyNe(Nibble, Nibble),
 
     // AXXX
-    MemSetI(u8, u8, u8),
+    MemSetI(Nibble, Nibble, Nibble),
 
     // BXXX
-    GotoPlusV0(u8, u8, u8),
+    GotoPlusV0(Nibble, Nibble, Nibble),
 
     // CXXX
-    Rand(u8, u8, u8),
+    Rand(Nibble, Nibble, Nibble),
 
     // DXXX
-    DispDraw(u8, u8, u8),
+    DispDraw(Nibble, Nibble, Nibble),
 
     // EXXX
-    KeyOpEqVx(u8),
-    KeyOpNeVx(u8),
+    KeyOpEqVx(Nibble),
+    KeyOpNeVx(Nibble),
 
     // FXXX
-    DelayGet(u8),
-    KeyOpGet(u8),
-    DelaySet(u8),
-    SoundSet(u8),
-    MemIPlusEqVx(u8),
-    MemISetSprite(u8),
-    Bcd(u8),
-    RegDump(u8),
-    RegLoad(u8),
+    DelayGet(Nibble),
+    KeyOpGet(Nibble),
+    DelaySet(Nibble),
+    SoundSet(Nibble),
+    MemIPlusEqVx(Nibble),
+    MemISetSprite(Nibble),
+    Bcd(Nibble),
+    RegDump(Nibble),
+    RegLoad(Nibble),
 }
 
 impl Op {
@@ -98,18 +101,20 @@ impl Op {
     }
 }
 
-impl From<u16> for Op {
-    fn from(item: u16) -> Self {
+type Address = u16;
+
+impl From<Address> for Op {
+    fn from(item: Address) -> Self {
         let mask = 0xF;
 
         // these are the 4 nibbles of item, where nibb_1 is the MSB and nibb_4 is the LSB
-        let nibb_1 = ((item >> 12) & mask) as u8;
-        let nibb_2 = ((item >> 8) & mask) as u8;
-        let nibb_3 = ((item >> 4) & mask) as u8;
-        let nibb_4 = (item & mask) as u8;
+        let nibb_1 = ((item >> 12) & mask) as Nibble;
+        let nibb_2 = ((item >> 8) & mask) as Nibble;
+        let nibb_3 = ((item >> 4) & mask) as Nibble;
+        let nibb_4 = (item & mask) as Nibble;
         let nibbles = [nibb_1, nibb_2, nibb_3, nibb_4];
 
-        let panic_msg = format!("unknown u16: {}", item);
+        let panic_msg = format!("unknown Address: {}", item);
 
         match nibbles {
             [0x0, n2, n3, n4] => match n4 {
