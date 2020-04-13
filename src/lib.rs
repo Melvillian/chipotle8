@@ -96,8 +96,8 @@
 
 #![warn(clippy::all)]
 
-use crate::graphics::Graphics;
 pub use crate::graphics::DisplayChange;
+use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
 pub use op::Op;
 use rand::{thread_rng, Rng};
@@ -180,6 +180,8 @@ pub trait AsKeyboard {
     /// keyboard.
     fn keys_down(&self) -> Vec<Key>;
 }
+
+type Address = u16;
 
 /// Stores the registers, memory, timers, and any other data necessary to run the interpreter.
 ///
@@ -835,7 +837,7 @@ impl Interpreter {
     }
 
     /// Flushes the recent changes to the interpreter's display and returns them
-    /// 
+    ///
     /// # Examples
     /// ```no_run
     /// # use std::io::Error;

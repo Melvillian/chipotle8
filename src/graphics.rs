@@ -62,7 +62,7 @@ impl Graphics {
     /// Given x (column) and y (row) coordinates for a bit in the buffer, return the corresponding
     /// index of that bit in the buffer
     #[inline]
-    pub fn get_graphics_idx(x: u8, y: u8) -> usize {
+    pub(crate) fn get_graphics_idx(x: u8, y: u8) -> usize {
         let column = x as usize % WIDTH;
         let row = (y as usize % HEIGHT) * WIDTH;
 
