@@ -67,7 +67,7 @@
 //!     window.limit_update_rate(Some(Duration::from_millis(16)));
 //!
 //!     // create the interpreter and load the pong game file
-//!     let mut interpreter = crate::Interpreter::with_game_file("data/PONG")?;
+//!     let mut interpreter = crate::Interpreter::with_game_file("games/PONG")?;
 //!
 //!     // setup keyboard
 //!     let device_state = DeviceState::new();
@@ -194,7 +194,7 @@ type Nibble = u8;
 /// # use std::io::Error;
 /// # use chipotle8::Interpreter;
 /// # fn main() -> Result<(), Error> {
-/// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+/// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
 ///
 /// // execute the first two instructions of the `PONG` game
 /// interpreter.cycle();
@@ -208,7 +208,7 @@ pub struct Interpreter {
     // The stack pointer always points on beyond the top of the stack, i.e. onto
     // unallocated memory
     stack: [usize; 16],  // 16-level stack holding instructions
-    addr: Address,           // address instruction register
+    addr: Address,       // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize, // program counter, 16 bits are needed but we use usize so we can index with it
 
@@ -306,7 +306,7 @@ impl Interpreter {
     /// # use std::io::Error;
     /// # use chipotle8::Interpreter;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
     ///
     /// # Ok(())
     /// # }
@@ -322,7 +322,7 @@ impl Interpreter {
     /// # use std::io::Error;
     /// # use chipotle8::Interpreter;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file_and_logger("data/PONG", None)?;
+    /// let mut interpreter = Interpreter::with_game_file_and_logger("games/PONG", None)?;
     ///
     /// # Ok(())
     /// # }
@@ -655,7 +655,7 @@ impl Interpreter {
     /// }
     ///
     /// fn main() -> Result<(), Error> {
-    ///     let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    ///     let mut interpreter = Interpreter::with_game_file("games/PONG")?;
     ///
     ///     let keyboard = Keyboard(DeviceState::new());
     ///
@@ -688,7 +688,7 @@ impl Interpreter {
     /// # use std::io::Error;
     /// # use chipotle8::Interpreter;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
     ///
     /// // this will return a slice 640x320 of all 0's,
     /// let display = interpreter.get_pixels();
@@ -714,7 +714,7 @@ impl Interpreter {
     /// # use std::io::Error;
     /// # use chipotle8::Interpreter;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
     ///
     /// // execute the first two instructions of the `PONG` game
     /// interpreter.cycle();
@@ -846,7 +846,7 @@ impl Interpreter {
     /// # use std::io::Error;
     /// # use chipotle8::{Interpreter, DisplayChange};
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("data/PONG")?;
+    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
     ///
     /// let changes: Vec<DisplayChange> = interpreter.flush_changes();
     /// // update your app's own display with these recent changes to the interpreter's display
