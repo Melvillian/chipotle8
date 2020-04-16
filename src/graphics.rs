@@ -1,4 +1,4 @@
-//! A wrapper around a 64x32 bit buffer array that abstracts the Interpreter's display state
+//! A wrapper around a 64x32 bit buffer array that abstracts the Emulator's display state
 
 use std::ops::Index;
 
@@ -151,7 +151,7 @@ impl Graphics {
         &self.display
     }
 
-    /// Flushes the recent changes to the interpreter's display and returns them
+    /// Flushes the recent changes to the emulator's display and returns them
     pub fn flush_changes(&mut self) -> Vec<DisplayChange> {
         let changes = self.changes.clone();
         self.changes.resize(0, DisplayChange::default());

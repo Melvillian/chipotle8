@@ -1,4 +1,4 @@
-//! A CHIP-8 interpreter that you can be used as a library in your Rust programs.
+//! A CHIP-8 emulator that you can be used as a library in your Rust programs.
 //!
 //! `chipotle8` lets you play retro classics like Pong with the keyboard and window
 //! crates of your choice. In the example below we choose to use the
@@ -14,7 +14,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use chipotle8::{AsKeyboard, Interpreter, Key, HEIGHT, WIDTH};
+//! use chipotle8::{AsKeyboard, Emulator, Key, HEIGHT, WIDTH};
 //! use device_query::{DeviceQuery, DeviceState, Keycode};
 //! use minifb::{ScaleMode, Window, WindowOptions};
 //! use std::io::Error;
@@ -52,7 +52,7 @@
 //! }
 //! fn main() -> Result<(), Error> {
 //!     let mut window: Window = Window::new(
-//!         "Chip 8 Interpreter (In Rust!)",
+//!         "Chip 8 Emulator (In Rust!)",
 //!         chipotle8::WIDTH,
 //!         chipotle8::HEIGHT,
 //!         WindowOptions {
@@ -66,28 +66,28 @@
 //!     // Limit to max update rate. This only needs about 60 Hz, which is 16ms
 //!     window.limit_update_rate(Some(Duration::from_millis(16)));
 //!
-//!     // create the interpreter and load the pong game file
-//!     let mut interpreter = crate::Interpreter::with_game_file("games/PONG")?;
+//!     // create the emulator and load the pong game file
+//!     let mut emulator = crate::Emulator::with_game_file("games/PONG")?;
 //!
 //!     // setup keyboard
 //!     let device_state = DeviceState::new();
 //!     let keyboard = Keyboard(device_state);
 //!
-//!     while window.is_open() && !keyboard.0.get_keys().contains(&Keycode::Escape) {
+//!     while window.is_open() {
 //!         thread::sleep(std::time::Duration::from_millis(
 //!             chipotle8::TIMER_CYCLE_INTERVAL,
 //!         ));
 //!
 //!         // execute the current operation and draw the display if it changed
-//!         if let Some(op) = interpreter.cycle() {
+//!         if let Some(op) = emulator.cycle() {
 //!             if op.is_display_op() {
-//!                 let display = interpreter.get_pixels();
+//!                 let display = emulator.get_pixels();
 //!                 window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();
 //!             }
 //!         }
 //!
-//!         // check for key press changes and update the Interpreter with which keys are up or down
-//!         interpreter.handle_key_input(&keyboard);
+//!         // check for key press changes and update the Emulator with which keys are up or down
+//!         emulator.handle_key_input(&keyboard);
 //!     }
 //!     Ok(())
 //! }
@@ -186,22 +186,22 @@ type Address = u16;
 // Rust doesn't have a 4-bit numeric type, so we waste 4 bits by storing nibbles in a u8. Oh well!
 type Nibble = u8;
 
-/// Stores the registers, memory, timers, and any other data necessary to run the interpreter.
+/// Stores the registers, memory, timers, and any other data necessary to run the emulator.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// # use std::io::Error;
-/// # use chipotle8::Interpreter;
+/// # use chipotle8::Emulator;
 /// # fn main() -> Result<(), Error> {
-/// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+/// let mut emulator = Emulator::with_game_file("games/PONG")?;
 ///
 /// // execute the first two instructions of the `PONG` game
-/// interpreter.cycle();
-/// interpreter.cycle();
+/// emulator.cycle();
+/// emulator.cycle();
 /// #    Ok(())
 /// # }
-pub struct Interpreter {
+pub struct Emulator {
     memory: [u8; 4096], // 4k of RAM
 
     sp: usize, // stack pointer for the 16-level
@@ -226,8 +226,8 @@ pub struct Interpreter {
     logger: Arc<Logger>,
 }
 
-impl Interpreter {
-    /// Creates an Interpreter with an optional Logger which will then need to have `initialize`
+impl Emulator {
+    /// Creates an Emulator with an optional Logger which will then need to have `initialize`
     /// called on it to load in the game file.
     ///
     /// Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
@@ -247,7 +247,7 @@ impl Interpreter {
         });
         let log = Arc::new(log);
 
-        let mut interpreter = Interpreter {
+        let mut emulator = Emulator {
             memory: [0; 4096],
             sp: 0,
             stack: [0; 16],
@@ -264,9 +264,9 @@ impl Interpreter {
             logger: log.clone(),
         };
 
-        // The first 512 bytes of memory were originally used to store the interpreter
-        // code itself, but since we are writing an interpreter and don't need to store
-        // interpreter code in the interpreter's memory those bytes are free for us to
+        // The first 512 bytes of memory were originally used to store the emulator
+        // code itself, but since we are writing an emulator and don't need to store
+        // emulator code in the emulator's memory those bytes are free for us to
         // put whatever we want there. So we put the font data there.
         let font_set: [[u8; NUM_BYTES_IN_FONT_CHAR as usize]; 16] = [
             [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
@@ -290,23 +290,23 @@ impl Interpreter {
         let mut mem_idx = FONT_DATA_START;
         for char_arr in font_set.iter() {
             for byte in char_arr.iter() {
-                interpreter.memory[mem_idx] = *byte;
+                emulator.memory[mem_idx] = *byte;
                 mem_idx += 1;
             }
         }
 
-        interpreter
+        emulator
     }
 
-    /// Creates an Interpreter with a path to a CHIP-8 game file.
+    /// Creates an Emulator with a path to a CHIP-8 game file.
     ///
     /// # Examples
     ///
     /// ```
     /// # use std::io::Error;
-    /// # use chipotle8::Interpreter;
+    /// # use chipotle8::Emulator;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+    /// let mut emulator = Emulator::with_game_file("games/PONG")?;
     ///
     /// # Ok(())
     /// # }
@@ -314,15 +314,15 @@ impl Interpreter {
         Self::with_game_file_and_logger(path_to_game_file, None)
     }
 
-    /// Creates an Interpreter with a path to a CHIP-8 game file and an optional logger.
+    /// Creates an Emulator with a path to a CHIP-8 game file and an optional logger.
     ///
     /// # Examples
     ///
     /// ```
     /// # use std::io::Error;
-    /// # use chipotle8::Interpreter;
+    /// # use chipotle8::Emulator;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file_and_logger("games/PONG", None)?;
+    /// let mut emulator = Emulator::with_game_file_and_logger("games/PONG", None)?;
     ///
     /// # Ok(())
     /// # }
@@ -334,16 +334,16 @@ impl Interpreter {
         // Note: `Into` trick allows passing `Logger` directly, without the `Some` part.
         // See http://xion.io/post/code/rust-optional-args.html
 
-        let mut interpreter = Interpreter::new(logger);
-        let res = interpreter.initialize(path_to_game_file);
+        let mut emulator = Emulator::new(logger);
+        let res = emulator.initialize(path_to_game_file);
         if res.is_ok() {
-            Ok(interpreter)
+            Ok(emulator)
         } else {
             Err(res.err().unwrap())
         }
     }
 
-    /// Update the state of the interpreter by running the operation
+    /// Update the state of the emulator by running the operation
     fn execute(&mut self, op: Op) {
         debug!(self.logger, "executing op: {:?}", op);
         match op {
@@ -636,13 +636,13 @@ impl Interpreter {
         Op::from(two_u8s_to_address(msb, lsb))
     }
 
-    /// Update the Interpreter keyboard using the state of the system keyboard.
+    /// Update the Emulator keyboard using the state of the system keyboard.
     ///
     /// # Examples
     ///
     /// ```
     /// # use std::io::Error;
-    /// # use chipotle8::{Interpreter, AsKeyboard, Key};
+    /// # use chipotle8::{Emulator, AsKeyboard, Key};
     /// use device_query::{DeviceQuery, DeviceState, Keycode};
     ///
     /// struct Keyboard(pub DeviceState);
@@ -655,11 +655,11 @@ impl Interpreter {
     /// }
     ///
     /// fn main() -> Result<(), Error> {
-    ///     let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+    ///     let mut emulator = Emulator::with_game_file("games/PONG")?;
     ///
     ///     let keyboard = Keyboard(DeviceState::new());
     ///
-    ///     interpreter.handle_key_input(&keyboard);
+    ///     emulator.handle_key_input(&keyboard);
     ///     Ok(())
     /// }
     pub fn handle_key_input(&mut self, keyboard: &impl AsKeyboard) {
@@ -686,19 +686,19 @@ impl Interpreter {
     ///
     /// ```no_run
     /// # use std::io::Error;
-    /// # use chipotle8::Interpreter;
+    /// # use chipotle8::Emulator;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+    /// let mut emulator = Emulator::with_game_file("games/PONG")?;
     ///
     /// // this will return a slice 640x320 of all 0's,
-    /// let display = interpreter.get_pixels();
+    /// let display = emulator.get_pixels();
     /// #    Ok(())
     /// # }
     pub fn get_pixels(&mut self) -> &[u32] {
         self.graphics.get_pixels()
     }
 
-    /// step forward one cycle in the interpreter. Returns Some(op) if an opcode was executed.
+    /// step forward one cycle in the emulator. Returns Some(op) if an opcode was executed.
     /// or None if we're in the blocking state waiting for a keyboard press.
     ///
     /// A cycle consists of:
@@ -712,13 +712,13 @@ impl Interpreter {
     ///
     /// ```no_run
     /// # use std::io::Error;
-    /// # use chipotle8::Interpreter;
+    /// # use chipotle8::Emulator;
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+    /// let mut emulator = Emulator::with_game_file("games/PONG")?;
     ///
     /// // execute the first two instructions of the `PONG` game
-    /// interpreter.cycle();
-    /// interpreter.cycle();
+    /// emulator.cycle();
+    /// emulator.cycle();
     /// #    Ok(())
     /// # }
     pub fn cycle(&mut self) -> Option<Op> {
@@ -765,7 +765,7 @@ impl Interpreter {
     }
 
     /// Return true if this operation is one of the many Ops for which we should
-    /// increment the program counter. All Ops except those which cause the Interpreter
+    /// increment the program counter. All Ops except those which cause the Emulator
     /// to jump to an instruction in memory (e.g. Return, Goto, GotoSubRtn and GotoPlusV0) should
     /// advance the program counter
     fn should_advance_pc(op: Op) -> bool {
@@ -787,10 +787,7 @@ impl Interpreter {
         self.sp = 0;
         self.pc = STARTING_MEMORY_BYTE;
 
-        debug!(
-            self.logger,
-            "initialized interpreter with game file: {}", path
-        );
+        debug!(self.logger, "initialized emulator with game file: {}", path);
 
         Ok(())
     }
@@ -839,17 +836,17 @@ impl Interpreter {
         }
     }
 
-    /// Flushes the recent changes to the interpreter's display and returns them
+    /// Flushes the recent changes to the emulator's display and returns them
     ///
     /// # Examples
     /// ```no_run
     /// # use std::io::Error;
-    /// # use chipotle8::{Interpreter, DisplayChange};
+    /// # use chipotle8::{Emulator, DisplayChange};
     /// # fn main() -> Result<(), Error> {
-    /// let mut interpreter = Interpreter::with_game_file("games/PONG")?;
+    /// let mut emulator = Emulator::with_game_file("games/PONG")?;
     ///
-    /// let changes: Vec<DisplayChange> = interpreter.flush_changes();
-    /// // update your app's own display with these recent changes to the interpreter's display
+    /// let changes: Vec<DisplayChange> = emulator.flush_changes();
+    /// // update your app's own display with these recent changes to the emulator's display
     /// // ...
     /// #    Ok(())
     /// # }

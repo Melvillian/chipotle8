@@ -6,7 +6,7 @@ use std::iter::FromIterator;
 use std::sync::Arc;
 
 /// Key's variants are the 16 keys from the CHIP-8's hexadecimal keyboard.
-/// The recommended key mapping, based on the standard CHIP-8 interpreter implementation is:
+/// The recommended key mapping, based on the standard CHIP-8 emulator implementation is:
 ///
 /// ```text
 /// Keyboard              Keypad
@@ -130,11 +130,11 @@ impl Keyboard {
         // check each of the 16 keys to see which have changed from up to down or vice versa
         for k in Key::variants() {
             let system_key_is_down = set.contains(&k);
-            let interpreter_key_is_down = self.get_key_state(k);
+            let emulator_key_is_down = self.get_key_state(k);
 
-            if system_key_is_down && !interpreter_key_is_down {
+            if system_key_is_down && !emulator_key_is_down {
                 self.set_key_down(k);
-            } else if !system_key_is_down && interpreter_key_is_down {
+            } else if !system_key_is_down && emulator_key_is_down {
                 self.set_key_up(k);
             }
         }
@@ -145,15 +145,15 @@ impl Keyboard {
         self.key_input[&k]
     }
 
-    /// Called when the KeyOpGet Op is executed. The interpreter will transition out of
+    /// Called when the KeyOpGet Op is executed. The emulator will transition out of
     /// the blocking state once a keypress gets detected
     pub fn block(&mut self, reg: u8) {
         self.fx0a_metadata.should_block_on_keypress = true;
         self.fx0a_metadata.register = Some(reg);
     }
 
-    /// Handle and reset the Interpreter from a key press. Only gets called
-    /// when the Interpreter is blocking as a result of a prior FX0A instruction. Return
+    /// Handle and reset the Emulator from a key press. Only gets called
+    /// when the Emulator is blocking as a result of a prior FX0A instruction. Return
     /// the index of the key stored earlier
     pub fn unblock(&mut self) -> usize {
         let reg_idx = self

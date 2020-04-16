@@ -1,4 +1,4 @@
-use chipotle8::{AsKeyboard, Interpreter, Key, HEIGHT, WIDTH};
+use chipotle8::{AsKeyboard, Emulator, Key, HEIGHT, WIDTH};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
@@ -37,7 +37,7 @@ impl AsKeyboard for Keyboard {
 
 fn main() -> Result<(), Error> {
     let mut window: Window = Window::new(
-        "Chip 8 Interpreter (In Rust!)",
+        "Chip 8 Emulator (In Rust!)",
         chipotle8::WIDTH,
         chipotle8::HEIGHT,
         WindowOptions {
@@ -51,28 +51,28 @@ fn main() -> Result<(), Error> {
     // Limit to max update rate. This only needs about 60 Hz, which is 16ms
     window.limit_update_rate(Some(Duration::from_millis(16)));
 
-    // create the interpreter and load the pong game file
-    let mut interpreter = crate::Interpreter::with_game_file("games/PONG")?;
+    // create the emulator and load the pong game file
+    let mut emulator = crate::Emulator::with_game_file("games/PONG")?;
 
     // setup keyboard
     let device_state = DeviceState::new();
     let keyboard = Keyboard(device_state);
 
-    while window.is_open() && !keyboard.0.get_keys().contains(&Keycode::Escape) {
+    while window.is_open() {
         thread::sleep(std::time::Duration::from_millis(
             chipotle8::TIMER_CYCLE_INTERVAL,
         ));
 
         // execute the current operation and draw the display if it changed
-        if let Some(op) = interpreter.cycle() {
+        if let Some(op) = emulator.cycle() {
             if op.is_display_op() {
-                let display = interpreter.get_pixels();
+                let display = emulator.get_pixels();
                 window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();
             }
         }
 
-        // check for key press changes and update the Interpreter with which keys are up or down
-        interpreter.handle_key_input(&keyboard);
+        // check for key press changes and update the Emulator with which keys are up or down
+        emulator.handle_key_input(&keyboard);
     }
     Ok(())
 }
