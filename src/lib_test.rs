@@ -840,7 +840,7 @@ pub mod emulator_tests {
 
             // now wait 2 cycles worth of time (plus a little bit more so we don't have flaky tests),
             // and make sure the value we get reflects the fact that time has passed
-            std::thread::sleep(std::time::Duration::from_millis(2 * TIMER_CYCLE_INTERVAL));
+            std::thread::sleep(std::time::Duration::from_millis(2 * CYCLE_INTERVAL_MS));
             std::thread::sleep(std::time::Duration::from_micros(100));
             emulator.execute(op);
 
@@ -1045,7 +1045,7 @@ pub mod emulator_tests {
             emulator.delay_timer = 2;
             emulator.sound_timer = 4;
 
-            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL));
+            std::thread::sleep(std::time::Duration::from_millis(CYCLE_INTERVAL_MS));
             emulator.decrement_timers_after_cycle();
 
             assert_eq!(emulator.delay_timer, 1);
@@ -1058,13 +1058,13 @@ pub mod emulator_tests {
             assert_eq!(emulator.sound_timer, 3);
 
             // now wait 2 interval's worth so they try to decrement by 2
-            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL * 2));
+            std::thread::sleep(std::time::Duration::from_millis(CYCLE_INTERVAL_MS * 2));
             emulator.decrement_timers_after_cycle();
 
             assert_eq!(emulator.delay_timer, 0);
             assert_eq!(emulator.sound_timer, 1);
 
-            std::thread::sleep(std::time::Duration::from_millis(TIMER_CYCLE_INTERVAL * 2));
+            std::thread::sleep(std::time::Duration::from_millis(CYCLE_INTERVAL_MS * 2));
             emulator.decrement_timers_after_cycle();
             emulator.decrement_timers_after_cycle();
 

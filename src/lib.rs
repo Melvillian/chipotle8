@@ -117,11 +117,9 @@ const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
 const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
 const MS_PER_SECOND: u64 = 1000;
-// 1000 / 480 == 2 milliseconds between each update
-/// 2 milliseconds between each cycle. Warning: using a different interval will result in undefined
-/// behavior.
-pub const TIMER_CYCLE_INTERVAL: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 
+// the number of milliseconds per cycle
+pub const CYCLE_INTERVAL_MS: u64 = MS_PER_SECOND / (CYCLES_PER_SECOND as u64);
 /// The width of the pixel resolution, currently 640
 pub const WIDTH: usize = graphics::WIDTH * graphics::ENLARGE_RATIO;
 /// the height of the pixel resolution, currently 320
@@ -617,7 +615,7 @@ impl Emulator {
         // a timely basis
         let ms_since_last_delay_set =
             (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
-        let num_decrement = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
+        let num_decrement = (ms_since_last_delay_set / CYCLE_INTERVAL_MS) as u8;
 
         self.delay_timer.saturating_sub(num_decrement)
     }
@@ -814,7 +812,7 @@ impl Emulator {
     /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_delay_timer_after_cycle(&mut self) {
         let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
-        let num_decrements = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
+        let num_decrements = (ms_since_last_delay_set / CYCLE_INTERVAL_MS) as u8;
 
         if num_decrements > 0 {
             self.delay_timer = self.delay_timer.saturating_sub(num_decrements);
@@ -826,7 +824,7 @@ impl Emulator {
     /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_sound_timer_after_cycle(&mut self) {
         let ms_since_last_sound_set = self.sound_timer_settime.elapsed().as_millis() as u64;
-        let num_decrements = (ms_since_last_sound_set / TIMER_CYCLE_INTERVAL) as u8;
+        let num_decrements = (ms_since_last_sound_set / CYCLE_INTERVAL_MS) as u8;
 
         if num_decrements > 0 {
             self.sound_timer = self.sound_timer.saturating_sub(num_decrements);
