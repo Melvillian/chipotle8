@@ -59,12 +59,10 @@ fn main() -> Result<(), Error> {
     let keyboard = Keyboard(device_state);
 
     while window.is_open() {
-        thread::sleep(std::time::Duration::from_millis(
-            chipotle8::TIMER_CYCLE_INTERVAL,
-        ));
 
-        // execute the current operation and draw the display if it changed
+        // execute the current instruction
         if let Some(op) = emulator.cycle() {
+            // draw the display if it changed
             if op.is_display_op() {
                 let display = emulator.get_pixels();
                 window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();

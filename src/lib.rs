@@ -74,12 +74,9 @@
 //!     let keyboard = Keyboard(device_state);
 //!
 //!     while window.is_open() {
-//!         thread::sleep(std::time::Duration::from_millis(
-//!             chipotle8::TIMER_CYCLE_INTERVAL,
-//!         ));
-//!
-//!         // execute the current operation and draw the display if it changed
+//!         // execute the current instruction
 //!         if let Some(op) = emulator.cycle() {
+//!             // draw the display if it changed
 //!             if op.is_display_op() {
 //!                 let display = emulator.get_pixels();
 //!                 window.update_with_buffer(display, WIDTH, HEIGHT).unwrap();
@@ -118,7 +115,7 @@ const STARTING_MEMORY_BYTE: usize = 512;
 const GAME_FILE_MEMORY_SIZE: usize = MEMORY_SIZE - (DISPLAY_REFRESH_SIZE + STARTING_MEMORY_BYTE);
 const FONT_DATA_START: usize = 0;
 const NUM_BYTES_IN_FONT_CHAR: u8 = 5;
-const CYCLES_PER_SECOND: u128 = 480; // 480 Hz
+const CYCLES_PER_SECOND: u128 = 60; // 60 Hz
 const MS_PER_SECOND: u64 = 1000;
 // 1000 / 480 == 2 milliseconds between each update
 /// 2 milliseconds between each cycle. Warning: using a different interval will result in undefined
@@ -817,9 +814,10 @@ impl Emulator {
     /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_delay_timer_after_cycle(&mut self) {
         let ms_since_last_delay_set = self.delay_timer_settime.elapsed().as_millis() as u64;
-        let num_decrements = ms_since_last_delay_set / TIMER_CYCLE_INTERVAL;
-        for _ in 0..num_decrements {
-            self.delay_timer = self.delay_timer.saturating_sub(1);
+        let num_decrements = (ms_since_last_delay_set / TIMER_CYCLE_INTERVAL) as u8;
+
+        if num_decrements > 0 {
+            self.delay_timer = self.delay_timer.saturating_sub(num_decrements);
             self.delay_timer_settime = time::Instant::now();
         }
     }
@@ -828,10 +826,10 @@ impl Emulator {
     /// than 16 milliseconds (the duration of a single cycle) have passed
     fn decrement_sound_timer_after_cycle(&mut self) {
         let ms_since_last_sound_set = self.sound_timer_settime.elapsed().as_millis() as u64;
-        let num_decrements = ms_since_last_sound_set / (TIMER_CYCLE_INTERVAL);
+        let num_decrements = (ms_since_last_sound_set / TIMER_CYCLE_INTERVAL) as u8;
 
-        for _ in 0..num_decrements {
-            self.sound_timer = self.sound_timer.saturating_sub(1);
+        if num_decrements > 0 {
+            self.sound_timer = self.sound_timer.saturating_sub(num_decrements);
             self.sound_timer_settime = time::Instant::now();
         }
     }
