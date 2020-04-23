@@ -2,7 +2,6 @@ use chipotle8::{AsKeyboard, Emulator, Key, HEIGHT, WIDTH};
 use device_query::{DeviceQuery, DeviceState, Keycode};
 use minifb::{ScaleMode, Window, WindowOptions};
 use std::io::Error;
-use std::thread;
 use std::time::Duration;
 
 struct Keyboard(pub DeviceState);

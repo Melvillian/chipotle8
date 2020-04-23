@@ -506,11 +506,11 @@ pub mod emulator_tests {
             let (msb, b, lsb) = usize_to_three_nibbles(instr);
             let addr = three_nibbles_to_address(msb, b, lsb);
 
-            assert_eq!(emulator.addr, 0);
+            assert_eq!(emulator.I, 0);
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, addr);
+            assert_eq!(emulator.I, addr);
         }
 
         #[test]
@@ -589,8 +589,8 @@ pub mod emulator_tests {
             // add arbitrary values starting at the memory address in I (which will be 0)
             // because these will be the values that get written to the graphics array
 
-            assert_eq!(emulator.addr, 0);
-            let starting_addr = emulator.addr as usize;
+            assert_eq!(emulator.I, 0);
+            let starting_addr = emulator.I as usize;
 
             let arb_byte: u8 = 0b10101010;
             for i in 0 as usize..height as usize {
@@ -666,7 +666,7 @@ pub mod emulator_tests {
             emulator.v[x as usize] = 0;
             emulator.v[y as usize] = (graphics::HEIGHT - 1) as u8;
 
-            let starting_addr = emulator.addr as usize;
+            let starting_addr = emulator.I as usize;
 
             let arb_byte: u8 = 0b11111111;
             for i in 0 as usize..height as usize {
@@ -710,7 +710,7 @@ pub mod emulator_tests {
             let x_reg = emulator.v[x as usize];
             let y_reg = emulator.v[y as usize];
 
-            let starting_addr = emulator.addr as usize;
+            let starting_addr = emulator.I as usize;
 
             let arb_byte: u8 = 0b11111111;
             for i in 0 as usize..height as usize {
@@ -904,7 +904,7 @@ pub mod emulator_tests {
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
-            assert_eq!(emulator.addr, 0);
+            assert_eq!(emulator.I, 0);
 
             // artificially set the register at x so the `addr` field will get set to that value
             // after the op gets run
@@ -912,16 +912,16 @@ pub mod emulator_tests {
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, 42);
+            assert_eq!(emulator.I, 42);
             assert_eq!(emulator.v[0xF], 0);
 
             // now try with overflowing
-            emulator.addr = std::u16::MAX;
+            emulator.I = std::u16::MAX;
             emulator.v[x as usize] = 1;
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, 0);
+            assert_eq!(emulator.I, 0);
             assert_eq!(emulator.v[0xF], 1);
         }
 
@@ -935,11 +935,11 @@ pub mod emulator_tests {
 
             emulator.v[x as usize] = 1;
             let reg = emulator.v[x as usize];
-            assert_eq!(emulator.addr, 0);
+            assert_eq!(emulator.I, 0);
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, (reg * NUM_BYTES_IN_FONT_CHAR) as u16);
+            assert_eq!(emulator.I, (reg * NUM_BYTES_IN_FONT_CHAR) as u16);
 
             // now try with largest byte value, we should see that we only
             // look at the least significant nibble, and so it should be char 255 % 16 === 15
@@ -949,7 +949,7 @@ pub mod emulator_tests {
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, (15 * NUM_BYTES_IN_FONT_CHAR) as u16);
+            assert_eq!(emulator.I, (15 * NUM_BYTES_IN_FONT_CHAR) as u16);
         }
 
         #[test]
@@ -960,15 +960,15 @@ pub mod emulator_tests {
             let op = Op::from(instr as u16);
             let (x, _, _) = usize_to_three_nibbles(instr);
 
-            assert_eq!(emulator.addr, 0);
+            assert_eq!(emulator.I, 0);
 
             emulator.v[x as usize] = 123;
 
             emulator.execute(op);
 
-            assert_eq!(emulator.memory[(emulator.addr + 0) as usize], 1);
-            assert_eq!(emulator.memory[(emulator.addr + 1) as usize], 2);
-            assert_eq!(emulator.memory[(emulator.addr + 2) as usize], 3);
+            assert_eq!(emulator.memory[(emulator.I + 0) as usize], 1);
+            assert_eq!(emulator.memory[(emulator.I + 1) as usize], 2);
+            assert_eq!(emulator.memory[(emulator.I + 2) as usize], 3);
         }
 
         #[test]
@@ -980,26 +980,26 @@ pub mod emulator_tests {
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             // fake putting values in the registers so our op will put them in the x
-            // bytes starting at memory location emulator.addr
+            // bytes starting at memory location emulator.I
             for i in 0..x + 1 {
                 emulator.v[i as usize] = i;
             }
 
-            emulator.addr = STARTING_MEMORY_BYTE as u16;
+            emulator.I = STARTING_MEMORY_BYTE as u16;
             for i in 0..16 {
-                assert_eq!(emulator.memory[(emulator.addr + i) as usize], 0);
+                assert_eq!(emulator.memory[(emulator.I + i) as usize], 0);
             }
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, STARTING_MEMORY_BYTE as u16);
+            assert_eq!(emulator.I, STARTING_MEMORY_BYTE as u16);
             for i in 0u8..16u8 {
                 if i <= x {
                     // these should have been set from the register values
-                    assert_eq!(emulator.memory[(emulator.addr + i as u16) as usize], i);
+                    assert_eq!(emulator.memory[(emulator.I + i as u16) as usize], i);
                 } else {
                     // these should not have changed
-                    assert_eq!(emulator.memory[(emulator.addr + i as u16) as usize], 0);
+                    assert_eq!(emulator.memory[(emulator.I + i as u16) as usize], 0);
                 }
             }
         }
@@ -1013,10 +1013,10 @@ pub mod emulator_tests {
             let (x, _, _) = usize_to_three_nibbles(instr);
 
             // fake putting values in memory so our op will put them in the x
-            // bytes starting at memory location emulator.addr
-            emulator.addr = STARTING_MEMORY_BYTE as u16;
+            // bytes starting at memory location emulator.I
+            emulator.I = STARTING_MEMORY_BYTE as u16;
             for i in 0..16 {
-                emulator.memory[(emulator.addr + i) as usize] = i as u8;
+                emulator.memory[(emulator.I + i) as usize] = i as u8;
             }
 
             for i in 0..x + 1 {
@@ -1025,7 +1025,7 @@ pub mod emulator_tests {
 
             emulator.execute(op);
 
-            assert_eq!(emulator.addr, STARTING_MEMORY_BYTE as u16);
+            assert_eq!(emulator.I, STARTING_MEMORY_BYTE as u16);
             for i in 0u8..16u8 {
                 if i <= x {
                     // these should have been set from the memory values

@@ -14,7 +14,6 @@ pub enum Op {
     DispClear,
     // 00EE 	Flow 	return; 	Returns from a subroutine.
     Return,
-
     // 1XXX
     // 1NNN 	Flow 	goto NNN; 	Jumps to address NNN.
     Goto(Nibble, Nibble, Nibble),

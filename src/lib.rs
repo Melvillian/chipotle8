@@ -93,6 +93,7 @@
 
 #![warn(clippy::all)]
 
+use crate::keyboard::Keyboard;
 pub use crate::graphics::DisplayChange;
 use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
@@ -196,14 +197,15 @@ type Nibble = u8;
 /// emulator.cycle();
 /// #    Ok(())
 /// # }
+#[allow(non_snake_case)]
 pub struct Emulator {
     memory: [u8; 4096], // 4k of RAM
 
     sp: usize, // stack pointer for the 16-level
-    // The stack pointer always points on beyond the top of the stack, i.e. onto
+    // The stack pointer always points one beyond the top of the stack, i.e. onto
     // unallocated memory
     stack: [usize; 16],  // 16-level stack holding instructions
-    addr: Address,       // address instruction register
+    I: Address,       // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize, // program counter, 16 bits are needed but we use usize so we can index with it
 
@@ -212,7 +214,7 @@ pub struct Emulator {
 
     graphics: Graphics, // 64x32 pixel monochrome screen
 
-    keyboard: crate::keyboard::Keyboard, // Stores the state of all keyboard input
+    keyboard: Keyboard, // Stores the state of all keyboard input
 
     delay_timer: u8,                    // 60 Hz timer that can be set and read
     delay_timer_settime: time::Instant, // the instant we last set the delay_timer
@@ -246,12 +248,12 @@ impl Emulator {
             memory: [0; 4096],
             sp: 0,
             stack: [0; 16],
-            addr: 0,
+            I: 0,
             prev_op: None,
             pc: 0,
             v: [0; 16],
             graphics: Graphics::new(),
-            keyboard: crate::keyboard::Keyboard::new(log.clone()),
+            keyboard: Keyboard::new(log.clone()),
             delay_timer: 0,
             delay_timer_settime: time::Instant::now(),
             sound_timer: 0,
@@ -350,7 +352,9 @@ impl Emulator {
                 self.sp -= 1;
                 self.pc = self.stack[self.sp];
 
-                // zero out the stack for good measure
+                // zero out the stack so we don't leave any instructions hanging around.
+                // This is mostly for cleanliness, so we always have exactly the data
+                // we care about in our stack.
                 self.stack[self.sp] = 0;
             }
             Op::Goto(msb, b, lsb) => {
@@ -479,7 +483,7 @@ impl Emulator {
             }
             Op::MemSetI(msb, b, lsb) => {
                 let addr = three_nibbles_to_address(msb, b, lsb);
-                self.addr = addr;
+                self.I = addr;
             }
             Op::GotoPlusV0(msb, b, lsb) => {
                 let addr = three_nibbles_to_address(msb, b, lsb);
@@ -499,7 +503,7 @@ impl Emulator {
 
                 let mut should_set_vf = false;
                 for row_delta in 0..height {
-                    let byte = self.memory[self.addr as usize + row_delta as usize];
+                    let byte = self.memory[self.I as usize + row_delta as usize];
                     for col_delta in 0..8 {
                         let is_black = ((byte >> (7 - col_delta)) & 1) == 1;
 
@@ -550,8 +554,8 @@ impl Emulator {
             Op::MemIPlusEqVx(x) => {
                 let reg = self.v[x as usize];
 
-                let (sum, did_overflow) = self.addr.overflowing_add(reg as u16);
-                self.addr = sum;
+                let (sum, did_overflow) = self.I.overflowing_add(reg as u16);
+                self.I = sum;
 
                 // don't forget to set VF if there's overflow
                 if did_overflow {
@@ -565,13 +569,13 @@ impl Emulator {
 
                 // the spec says the register at x must store a single hex digit, but in order
                 // to be safe we protect against undefined behavior if values greater than 0xF
-                // exist in the register by only using the first nible of data stored in the
+                // exist in the register by only using the first nibble of data stored in the
                 // register
                 let least_nibble = reg & 0b1111;
 
                 let font_idx = (FONT_DATA_START as u8) + (least_nibble * NUM_BYTES_IN_FONT_CHAR);
 
-                self.addr = font_idx as Address;
+                self.I = font_idx as Address;
             }
             Op::Bcd(x) => {
                 let reg = self.v[x as usize];
@@ -579,7 +583,7 @@ impl Emulator {
                                        // "0" is 48, for "1" is 49, ... for "9" is 57
 
                 let decimal_repr = format!("{:03}", reg);
-                let addr_usize = self.addr as usize;
+                let addr_usize = self.I as usize;
 
                 let hundreds_place = decimal_repr.get(0..1).unwrap().as_bytes()[0] - ascii_offset;
                 self.memory[addr_usize + 0 as usize] = hundreds_place;
@@ -593,13 +597,13 @@ impl Emulator {
             Op::RegDump(x) => {
                 for i in 0..=x {
                     // the spec says the range in inclusive, so we do =x
-                    self.memory[self.addr as usize + i as usize] = self.v[i as usize];
+                    self.memory[self.I as usize + i as usize] = self.v[i as usize];
                 }
             }
             Op::RegLoad(x) => {
                 for i in 0..=x {
                     // the spec says the range in inclusive, so we do =x
-                    self.v[i as usize] = self.memory[self.addr as usize + i as usize];
+                    self.v[i as usize] = self.memory[self.I as usize + i as usize];
                 }
             }
         }
@@ -721,10 +725,10 @@ impl Emulator {
         if !self.keyboard.is_blocking() {
             debug!(
                 self.logger,
-                "before: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+                "before: (sp: {}, stack: {:?} I: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
                 self.sp,
                 self.stack.to_vec(),
-                self.addr,
+                self.I,
                 self.pc,
                 self.v.to_vec(),
                 self.delay_timer,
@@ -744,10 +748,10 @@ impl Emulator {
 
             debug!(
                 self.logger,
-                "after: (sp: {}, stack: {:?} addr: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
+                "after: (sp: {}, stack: {:?} I: {}, pc: {}, v: {:?}, delay: {}, sound: {}",
                 self.sp,
                 self.stack.to_vec(),
-                self.addr,
+                self.I,
                 self.pc,
                 self.v.to_vec(),
                 self.delay_timer,
