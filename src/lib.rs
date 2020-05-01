@@ -612,11 +612,23 @@ impl Emulator {
     /// Return the value of the delay timer, accounting for any timer that has passed since
     /// the timer was last set.
     fn get_delay_state(&self) -> u8 {
-        // we need to do this more complicated calculation because some time might have
-        // passed since we last set the delay_timer, and so we make up for it by calculating
-        // what the delay_timer would have been had we set it exactly at every 16ms. This
-        // isn't a realtime operating system so we can't guarantee that a cycle gets run on
-        // a timely basis
+        // we need to do this more complicated calculation because if we did the simpler
+        // implementation (just a `return self.delay_timer`) then there's an edge case
+        // where we would return an incorrect value for the timer. This edge case happens
+        // in the possible (though extremely unlikely since it takes our Emulator ~2ms to
+        // execute its most lengthy instruction `DispDraw`) case that more than CYCLE_INTERVAL_MS
+        // number of milliseconds have passed since we last called `.cycle` where we decrement
+        // the `delay_timer`.
+        //
+        // Since the Emulator is supposed to guarantee that `delay_timer` decrements every
+        // CYCLE_INTERVAL_MS ms, yet CYCLE_INTERVAL_MS ms have passed without calling `.cycle`
+        // and decrementing the `delay_timer`, we'll return a higher number for `delay_timer`
+        // than we should.
+        //
+        // To remedy this, every time `get_delay_state` gets called we need to account
+        // for the real time that has passed since we last decremented the `delay_timer`
+        // by calculating how many CYCLE_INTERVAL_MS number of milliseconds have passed.
+        //  without If this were the case then we would return a higher value than
         let ms_since_last_delay_set =
             (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
         let num_decrement = (ms_since_last_delay_set / CYCLE_INTERVAL_MS) as u8;
