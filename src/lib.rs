@@ -1,4 +1,4 @@
-//! A CHIP-8 emulator that you can be used as a library in your Rust programs.
+//! A CHIP-8 emulator that can be used as a library in your Rust programs.
 //!
 //! `chipotle8` lets you play retro classics like Pong with the keyboard and window
 //! crates of your choice. In the example below we choose to use the
@@ -93,10 +93,10 @@
 
 #![warn(clippy::all)]
 
-use crate::keyboard::Keyboard;
 pub use crate::graphics::DisplayChange;
 use crate::graphics::Graphics;
 pub use crate::keyboard::Key;
+use crate::keyboard::Keyboard;
 pub use op::Op;
 use rand::{thread_rng, Rng};
 use slog::debug;
@@ -205,7 +205,7 @@ pub struct Emulator {
     // The stack pointer always points one beyond the top of the stack, i.e. onto
     // unallocated memory
     stack: [usize; 16],  // 16-level stack holding instructions
-    I: Address,       // address instruction register
+    I: Address,          // address instruction register
     prev_op: Option<Op>, // the instruction executed last cycle, used to know when to draw
     pc: usize, // program counter, 16 bits are needed but we use usize so we can index with it
 
@@ -628,7 +628,6 @@ impl Emulator {
         // To remedy this, every time `get_delay_state` gets called we need to account
         // for the real time that has passed since we last decremented the `delay_timer`
         // by calculating how many CYCLE_INTERVAL_MS number of milliseconds have passed.
-        //  without If this were the case then we would return a higher value than
         let ms_since_last_delay_set =
             (time::Instant::now() - self.delay_timer_settime).as_millis() as u64;
         let num_decrement = (ms_since_last_delay_set / CYCLE_INTERVAL_MS) as u8;

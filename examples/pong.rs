@@ -58,7 +58,6 @@ fn main() -> Result<(), Error> {
     let keyboard = Keyboard(device_state);
 
     while window.is_open() {
-
         // execute the current instruction
         if let Some(op) = emulator.cycle() {
             // draw the display if it changed
