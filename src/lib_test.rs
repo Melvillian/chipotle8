@@ -32,17 +32,17 @@ pub mod emulator_tests {
             let op = Op::from(instr);
 
             // set some graphics bits to true so we can later see them set to false;
-            emulator.graphics.xor_set(0, 0, true);
+            emulator.graphics.xor_set(0, 0, false);
             emulator.graphics.xor_set(
                 (graphics::WIDTH - 1) as u8,
                 (graphics::HEIGHT - 1) as u8,
-                true,
+                false,
             );
 
             emulator.execute(op);
 
             for i in 0..emulator.graphics.len() {
-                assert_eq!(emulator.graphics[i], 0);
+                assert_eq!(emulator.graphics[i], graphics::BLACK_RGB);
             }
         }
 

@@ -7,8 +7,8 @@ pub const HEIGHT: usize = 32;
 pub const ENLARGE_RATIO: usize = 10;
 use serde::Serialize;
 
-const WHITE_RGB: u32 = 0x00FF_FFFF;
-const BLACK_RGB: u32 = 0x0000_0000;
+pub const WHITE_RGB: u32 = 0x0000_0000;
+pub const BLACK_RGB: u32 = 0x00FF_FFFF;
 
 /// The max size the Graphic's `changes` `Vec` can grow until we set it to be empty.
 /// We need this because without periodically trimming it `changes` will grow unbounded
@@ -72,25 +72,25 @@ impl Graphics {
     /// Set the given pixel at `idx` to the XOR of the current pixel at `idx` and black if `enable`
     /// equals true or white if `enable` equals false. Returns true if the pixel was unset
     #[inline]
-    pub fn xor_set(&mut self, x: u8, y: u8, enabled: bool) -> bool {
+    pub fn xor_set(&mut self, x: u8, y: u8, is_black: bool) -> bool {
         let idx = Self::get_graphics_idx(x, y);
 
         let prev_pix = self.buffer[idx];
 
-        if enabled {
-            self.buffer[idx] ^= WHITE_RGB;
-        } else {
+        if is_black {
             self.buffer[idx] ^= BLACK_RGB;
+        } else {
+            self.buffer[idx] ^= WHITE_RGB;
         }
 
         // we keep a running collection of recent changes to the display, so we must update it
         self.add_change(DisplayChange {
             x: x as usize % WIDTH,
             y: y as usize % HEIGHT,
-            is_alive: enabled,
+            is_alive: is_black,
         });
 
-        prev_pix == WHITE_RGB && self.buffer[idx] == BLACK_RGB
+        prev_pix == BLACK_RGB && self.buffer[idx] == WHITE_RGB
     }
 
     /// Add a new DisplayChange to `changes`, and shrink `changes` if it's too large
@@ -177,7 +177,7 @@ pub mod graphics_tests {
     fn changes() {
         let mut g = Graphics::new();
 
-        // artificially set some pixels so we can xor_set them later
+        // artificially set some pixels
         g.xor_set(0, 0, true);
         g.xor_set(0, 1, false);
         g.xor_set(1, 0, false);
